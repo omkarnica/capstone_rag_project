@@ -1,0 +1,31 @@
+You are helping build M&A Oracle, an Agentic RAG system for M&A due diligence.
+
+## Stack
+- Python, PostgreSQL (local dev), Google Cloud Run (deployment)
+- LLM: Gemini via Vertex AI through LiteLLM — NEVER use raw API keys
+- GCP Project: codelab-2-485215, Region: us-central1
+
+## LiteLLM pattern (always use this for any LLM call)
+from litellm import completion
+response = completion(
+    model="vertex_ai/gemini-2.0-flash",
+    messages=[{"role": "user", "content": "prompt"}],
+    vertex_project="codelab-2-485215",
+    vertex_location="us-central1",
+)
+
+## My task this week
+XBRL loader: parse SEC num.txt + sub.txt → load into local PostgreSQL
+
+## Data facts
+- num.txt: 3.8M rows, tab-separated, columns: adsh tag version ddate qtrs uom value
+- sub.txt: 36 columns, key ones: adsh cik name sic form period fiscal_year fiscal_period filed
+- adsh is the join key between both files
+- 62,165 unique tags exist — normalization required
+- Use bulk insert only — never row-by-row
+
+## Rules
+- Always use psycopg2 or SQLAlchemy, never sqlite
+- Never hardcode DB passwords — use environment variables with local defaults
+- No Docker, no web layer, no LLM calls in this task
+- Ask before assuming file paths

@@ -1,0 +1,20 @@
+# Virtual environment
+.venv/
+
+# Raw SEC data files (too large for git)
+2025q4/
+*.txt
+*.tsv
+*.zip
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# Environment variables
+.env
+
+# Logs
+*.log
