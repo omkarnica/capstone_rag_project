@@ -7,8 +7,8 @@
 
 ## Your Branch Naming
 - karnica/xbrl-loader
-- teammateA/html-parser
-- teammateB/book-rag
+- NithuA/html-parser
+- Ruby Gunna/book-rag
 
 ## Daily Workflow
 
