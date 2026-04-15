@@ -11,12 +11,16 @@ Requirements covered:
 from __future__ import annotations
 
 import os
+import time
 from io import StringIO
 from typing import Optional
 
 import pandas as pd
 import psycopg2
 from psycopg2.extensions import connection as PgConnection
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def get_connection(
@@ -49,6 +53,7 @@ def _copy_dataframe(
     Returns number of loaded rows.
     """
     if df.empty:
+        logger.info("Skipped COPY for empty dataframe", extra={"table_name": table_name})
         return 0
 
     missing = [c for c in columns if c not in df.columns]
@@ -77,10 +82,20 @@ def _copy_dataframe(
         "FROM STDIN WITH (FORMAT TEXT, DELIMITER E'\\t', NULL '\\N')"
     )
 
+    started_at = time.perf_counter()
     with conn.cursor() as cur:
         cur.copy_expert(copy_sql, buffer)
-
-    return len(copy_df)
+    elapsed_seconds = time.perf_counter() - started_at
+    rows_loaded = len(copy_df)
+    logger.info(
+        "Completed COPY operation",
+        extra={
+            "table_name": table_name,
+            "rows_loaded": rows_loaded,
+            "elapsed_seconds": round(elapsed_seconds, 6),
+        },
+    )
+    return rows_loaded
 
 
 def load_filings(conn: PgConnection, filings_df: pd.DataFrame) -> int:
@@ -116,6 +131,10 @@ def load_filings(conn: PgConnection, filings_df: pd.DataFrame) -> int:
         """)
         inserted = cur.rowcount
 
+    logger.info(
+        "Inserted filings rows",
+        extra={"table_name": "filings", "rows_inserted": inserted},
+    )
     return inserted
 
 
@@ -128,7 +147,12 @@ def load_facts(conn: PgConnection, facts_df: pd.DataFrame) -> int:
     facts_columns = [
         "adsh", "tag", "version", "ddate", "qtrs", "uom", "value",
     ]
-    return _copy_dataframe(conn, facts_df, "facts", facts_columns)
+    inserted = _copy_dataframe(conn, facts_df, "facts", facts_columns)
+    logger.info(
+        "Inserted facts rows",
+        extra={"table_name": "facts", "rows_inserted": inserted},
+    )
+    return inserted
 
 
 def load_xbrl_data(

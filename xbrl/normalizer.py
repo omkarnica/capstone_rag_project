@@ -7,6 +7,9 @@ from __future__ import annotations
 import pandas as pd
 
 from .tag_map import TAG_MAP
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def normalize_facts_tags(facts_df: pd.DataFrame) -> pd.DataFrame:
@@ -20,7 +23,17 @@ def normalize_facts_tags(facts_df: pd.DataFrame) -> pd.DataFrame:
     if "tag" not in facts_df.columns:
         raise ValueError("facts_df must contain a 'tag' column.")
 
+    normalized_count = int(facts_df["tag"].isin(TAG_MAP.keys()).sum())
+    unknown_count = int((~facts_df["tag"].isin(TAG_MAP.keys())).sum())
     normalized_df = facts_df.copy()
     normalized_df["tag"] = normalized_df["tag"].replace(TAG_MAP)
+    logger.info(
+        "Normalized facts tags",
+        extra={
+            "normalized_tags": normalized_count,
+            "unknown_tags": unknown_count,
+            "total_rows": len(facts_df),
+        },
+    )
     return normalized_df
 

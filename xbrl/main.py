@@ -19,6 +19,9 @@ from pathlib import Path
 import requests
 
 from . import loader, normalizer, parser
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 # ── Target companies ──────────────────────────────────────────────────────────
 TARGET_CIKS = {
@@ -59,7 +62,7 @@ def download_and_extract(quarter: str, extract_dir: Path) -> tuple[Path, Path]:
     # The XBRL bulk data lives at a different URL pattern
     xbrl_url = f"https://www.sec.gov/files/dera/data/financial-statement-data-sets/{quarter}.zip"
 
-    print(f"  Downloading {xbrl_url} ...")
+    logger.info("Downloading quarter archive", extra={"quarter": quarter, "url": xbrl_url})
     response = requests.get(xbrl_url, headers={"User-Agent": "karnicajain.ds@gmail.com"}, timeout=120)
     response.raise_for_status()
 
@@ -90,6 +93,10 @@ def run_pipeline(sub_path: str | Path, num_path: str | Path) -> tuple[int, int]:
     Returns:
         (filings_loaded, facts_loaded)
     """
+    logger.info(
+        "Pipeline start",
+        extra={"sub_path": str(sub_path), "num_path": str(num_path)},
+    )
     # 1. Parse
     filings_df, facts_df = parser.parse_xbrl(sub_path=sub_path, num_path=num_path)
 
@@ -98,7 +105,10 @@ def run_pipeline(sub_path: str | Path, num_path: str | Path) -> tuple[int, int]:
     valid_adsh = set(filings_df["adsh"])
     facts_df   = facts_df[facts_df["adsh"].isin(valid_adsh)]
 
-    print(f"    After filter → {len(filings_df)} filings, {len(facts_df)} facts")
+    logger.info(
+        "Applied CIK filter",
+        extra={"filtered_filings": len(filings_df), "filtered_facts": len(facts_df)},
+    )
 
     # 3. Normalize tags
     normalized_facts_df = normalizer.normalize_facts_tags(facts_df)
@@ -114,6 +124,10 @@ def run_pipeline(sub_path: str | Path, num_path: str | Path) -> tuple[int, int]:
     finally:
         conn.close()
 
+    logger.info(
+        "Pipeline end",
+        extra={"filings_loaded": filings_loaded, "facts_loaded": facts_loaded},
+    )
     return filings_loaded, facts_loaded
 
 
@@ -131,20 +145,31 @@ def run_all_quarters(extract_dir: str | Path = Path("data/raw")) -> None:
     total_facts   = 0
 
     for quarter in QUARTERS:
-        print(f"\n{'='*50}")
-        print(f"Processing {quarter} ...")
+        logger.info("Processing quarter", extra={"quarter": quarter})
         try:
             sub_path, num_path = download_and_extract(quarter, extract_dir)
             filings_loaded, facts_loaded = run_pipeline(sub_path, num_path)
             total_filings += filings_loaded
             total_facts   += facts_loaded
-            print(f"  ✓ {quarter}: {filings_loaded} filings, {facts_loaded} facts loaded")
+            logger.info(
+                "Quarter processed",
+                extra={
+                    "quarter": quarter,
+                    "filings_loaded": filings_loaded,
+                    "facts_loaded": facts_loaded,
+                },
+            )
         except Exception as e:
             # Log the error but keep going — don't let one bad quarter stop the rest
-            print(f"  ✗ {quarter} FAILED: {e}")
+            logger.warning(
+                "Skipped quarter due to error",
+                extra={"quarter": quarter, "error": str(e)},
+            )
 
-    print(f"\n{'='*50}")
-    print(f"Done. Total loaded → filings: {total_filings}, facts: {total_facts}")
+    logger.info(
+        "All quarters completed",
+        extra={"total_filings_loaded": total_filings, "total_facts_loaded": total_facts},
+    )
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
@@ -171,8 +196,10 @@ def main() -> None:
 
     if args.command == "single":
         filings_loaded, facts_loaded = run_pipeline(args.sub_path, args.num_path)
-        print(f"Loaded filings: {filings_loaded}")
-        print(f"Loaded facts:   {facts_loaded}")
+        logger.info(
+            "Single run completed",
+            extra={"filings_loaded": filings_loaded, "facts_loaded": facts_loaded},
+        )
 
     elif args.command == "all":
         run_all_quarters()

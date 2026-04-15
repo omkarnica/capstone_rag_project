@@ -20,3 +20,4 @@ __pycache__/
 *.log
 .cursor/
 
+ma_oracle.egg-info/
