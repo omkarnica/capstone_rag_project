@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Tuple
 
 import pandas as pd
+from src.utils.exceptions import parse_error_boundary
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -24,13 +25,14 @@ def _read_tsv(path: Path, dtype: dict | None = None, parse_dates: list[str] | No
 
     The SEC bulk files are actually TSVs despite the .txt extension.
     """
-    return pd.read_csv(
-        path,
-        sep="\t",
-        dtype=dtype,
-        parse_dates=parse_dates or [],
-        low_memory=False,
-    )
+    with parse_error_boundary(str(path)):
+        return pd.read_csv(
+            path,
+            sep="\t",
+            dtype=dtype,
+            parse_dates=parse_dates or [],
+            low_memory=False,
+        )
 
 
 def parse_filings(sub_path: str | Path) -> pd.DataFrame:

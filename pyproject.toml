@@ -5,6 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ma-oracle"
 version = "0.1.0"
+dependencies = [
+    "tenacity>=9.1.4",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
