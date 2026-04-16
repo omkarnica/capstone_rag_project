@@ -1,5 +1,15 @@
 """
-Normalize raw XBRL tags in a facts DataFrame to canonical tags.
+Normalize raw XBRL tags in a facts DataFrame to canonical names.
+
+Replaces raw XBRL tag strings in facts_df['tag'] with canonical names
+defined in TAG_MAP (xbrl/tag_map.py). Tags not present in TAG_MAP are
+passed through unchanged.
+
+Expected facts_df columns:
+    tag   (string)   — raw XBRL tag, e.g. "us-gaap/Revenues"
+    value (float64)  — numeric fact value
+    adsh  (string)   — accession number; join key to the filings table
+    ddate (date)     — data date for the reported value
 """
 
 from __future__ import annotations

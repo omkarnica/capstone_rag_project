@@ -1,12 +1,14 @@
 """
-Main entrypoint for the XBRL loader pipeline.
+Main entrypoint for the XBRL ingestion pipeline.
 
-Flow:
-1) Download and extract SEC quarterly zip (sub.txt + num.txt)
-2) Parse SEC files
-3) Filter to target companies only
-4) Normalize facts tags to canonical tags
-5) Bulk load filings and facts into PostgreSQL
+Ingestion flow:
+1) Download — fetch the SEC XBRL quarterly zip from EDGAR
+   (https://www.sec.gov/files/dera/data/financial-statement-data-sets/<quarter>.zip)
+2) Extract — unzip to obtain sub.txt (filing metadata) and num.txt (numeric facts)
+3) Parse — read sub.txt and num.txt into Pandas DataFrames; filter to target CIKs
+4) Normalize — map raw XBRL tags to canonical names via TAG_MAP
+5) Bulk load — COPY DataFrames into PostgreSQL using staging tables and
+   ON CONFLICT DO NOTHING to make reruns safe
 """
 
 from __future__ import annotations
