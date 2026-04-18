@@ -24,7 +24,7 @@ import argparse
 from src.transcripts import fetcher, loader, parser
 from src.utils.exceptions import MAOracleError
 from src.utils.logger import get_logger
-from xbrl.loader import get_connection
+from src.xbrl.loader import get_connection
 
 logger = get_logger(__name__)
 
