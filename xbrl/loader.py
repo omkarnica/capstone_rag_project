@@ -18,6 +18,7 @@ from typing import Optional
 import pandas as pd
 import psycopg2
 from psycopg2.extensions import connection as PgConnection
+from src.utils.exceptions import db_error_boundary
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -33,13 +34,14 @@ def get_connection(
     """
     Create a PostgreSQL connection using explicit args or env defaults.
     """
-    return psycopg2.connect(
-        host=host or os.getenv("PGHOST", "localhost"),
-        port=port or int(os.getenv("PGPORT", "5433")),
-        dbname=dbname or os.getenv("PGDATABASE", "ma_oracle"),
-        user=user or os.getenv("PGUSER", "postgres"),
-        password=password or os.getenv("PGPASSWORD", ""),
-    )
+    with db_error_boundary("connect"):
+        return psycopg2.connect(
+            host=host or os.getenv("PGHOST", "localhost"),
+            port=port or int(os.getenv("PGPORT", "5433")),
+            dbname=dbname or os.getenv("PGDATABASE", "ma_oracle"),
+            user=user or os.getenv("PGUSER", "postgres"),
+            password=password or os.getenv("PGPASSWORD", ""),
+        )
 
 
 def _copy_dataframe(
@@ -83,8 +85,9 @@ def _copy_dataframe(
     )
 
     started_at = time.perf_counter()
-    with conn.cursor() as cur:
-        cur.copy_expert(copy_sql, buffer)
+    with db_error_boundary("COPY", table=table_name):
+        with conn.cursor() as cur:
+            cur.copy_expert(copy_sql, buffer)
     elapsed_seconds = time.perf_counter() - started_at
     rows_loaded = len(copy_df)
     logger.info(

@@ -16,14 +16,31 @@ from __future__ import annotations
 import argparse
 import io
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 
 import requests
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from . import loader, normalizer, parser
+from src.utils.exceptions import MAOracleError, ParseError, download_error_boundary
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+# ── Pipeline result ───────────────────────────────────────────────────────────
+
+@dataclass
+class PipelineResult:
+    """Structured outcome for a single quarter's pipeline run."""
+
+    quarter: str
+    success: bool
+    filings_loaded: int = 0
+    facts_loaded: int = 0
+    error: str | None = None
+
 
 # ── Target companies ──────────────────────────────────────────────────────────
 TARGET_CIKS = {
@@ -45,6 +62,27 @@ SEC_BASE_URL = "https://www.sec.gov/Archives/edgar/full-index"
 
 # ── Download helper ───────────────────────────────────────────────────────────
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+)
+def _download_zip(url: str) -> bytes:
+    """
+    Fetch a ZIP archive from SEC EDGAR. Retried up to 3 times with
+    exponential backoff (2s → 4s → 8s). Re-raises the original
+    requests exception on exhaustion so the caller's error boundary
+    can translate it.
+    """
+    response = requests.get(
+        url,
+        headers={"User-Agent": "karnicajain.ds@gmail.com"},
+        timeout=120,
+    )
+    response.raise_for_status()
+    return response.content
+
+
 def download_and_extract(quarter: str, extract_dir: Path) -> tuple[Path, Path]:
     """
     Download a SEC quarterly zip file and extract sub.txt + num.txt.
@@ -55,33 +93,37 @@ def download_and_extract(quarter: str, extract_dir: Path) -> tuple[Path, Path]:
 
     Returns:
         (sub_path, num_path)
+
+    Raises:
+        DownloadError: if the HTTP fetch fails after 3 attempts.
+        ParseError:    if sub.txt or num.txt are missing from the archive.
     """
-    year = quarter[:4]       # "2024"
-    q    = quarter[4:]       # "q1"
-
-    url = f"https://www.sec.gov/Archives/edgar/full-index/{year}/{q.upper()}/company.zip"
-
-    # The XBRL bulk data lives at a different URL pattern
-    xbrl_url = f"https://www.sec.gov/files/dera/data/financial-statement-data-sets/{quarter}.zip"
+    xbrl_url = (
+        f"https://www.sec.gov/files/dera/data/financial-statement-data-sets/{quarter}.zip"
+    )
 
     logger.info("Downloading quarter archive", extra={"quarter": quarter, "url": xbrl_url})
-    response = requests.get(xbrl_url, headers={"User-Agent": "karnicajain.ds@gmail.com"}, timeout=120)
-    response.raise_for_status()
+
+    # Boundary sits outside _download_zip: retries exhaust first, then the
+    # surviving requests exception is translated to DownloadError exactly once.
+    with download_error_boundary(xbrl_url):
+        content = _download_zip(xbrl_url)
 
     extract_dir = extract_dir / quarter
     extract_dir.mkdir(parents=True, exist_ok=True)
 
-    with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
+    with zipfile.ZipFile(io.BytesIO(content)) as zf:
         zf.extractall(extract_dir)
 
     sub_path = extract_dir / "sub.txt"
     num_path = extract_dir / "num.txt"
 
-    if not sub_path.exists() or not num_path.exists():
-        raise FileNotFoundError(
-            f"Expected sub.txt and num.txt inside {quarter}.zip but did not find them. "
-            f"Files found: {list(extract_dir.iterdir())}"
-        )
+    for expected_path in (sub_path, num_path):
+        if not expected_path.exists():
+            raise ParseError(
+                f"Expected file not found after extracting {quarter}.zip",
+                path=str(expected_path),
+            )
 
     return sub_path, num_path
 
@@ -135,24 +177,27 @@ def run_pipeline(sub_path: str | Path, num_path: str | Path) -> tuple[int, int]:
 
 # ── Multi-quarter loop ────────────────────────────────────────────────────────
 
-def run_all_quarters(extract_dir: str | Path = Path("data/raw")) -> None:
+def run_all_quarters(
+    extract_dir: str | Path = Path("data/raw"),
+) -> list[PipelineResult]:
     """
     Download and load all quarters defined in QUARTERS.
 
     Args:
         extract_dir: local folder where zip files are extracted
+
+    Returns:
+        One PipelineResult per quarter — callers can inspect failures
+        without parsing log output.
     """
     extract_dir = Path(extract_dir)
-    total_filings = 0
-    total_facts   = 0
+    results: list[PipelineResult] = []
 
     for quarter in QUARTERS:
         logger.info("Processing quarter", extra={"quarter": quarter})
         try:
             sub_path, num_path = download_and_extract(quarter, extract_dir)
             filings_loaded, facts_loaded = run_pipeline(sub_path, num_path)
-            total_filings += filings_loaded
-            total_facts   += facts_loaded
             logger.info(
                 "Quarter processed",
                 extra={
@@ -161,17 +206,36 @@ def run_all_quarters(extract_dir: str | Path = Path("data/raw")) -> None:
                     "facts_loaded": facts_loaded,
                 },
             )
-        except Exception as e:
-            # Log the error but keep going — don't let one bad quarter stop the rest
+            results.append(
+                PipelineResult(
+                    quarter=quarter,
+                    success=True,
+                    filings_loaded=filings_loaded,
+                    facts_loaded=facts_loaded,
+                )
+            )
+        except MAOracleError as e:
             logger.warning(
                 "Skipped quarter due to error",
                 extra={"quarter": quarter, "error": str(e)},
             )
+            results.append(
+                PipelineResult(quarter=quarter, success=False, error=str(e))
+            )
+
+    total_filings = sum(r.filings_loaded for r in results)
+    total_facts   = sum(r.facts_loaded   for r in results)
+    failed        = [r.quarter for r in results if not r.success]
 
     logger.info(
         "All quarters completed",
-        extra={"total_filings_loaded": total_filings, "total_facts_loaded": total_facts},
+        extra={
+            "total_filings_loaded": total_filings,
+            "total_facts_loaded": total_facts,
+            "failed_quarters": failed,
+        },
     )
+    return results
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
