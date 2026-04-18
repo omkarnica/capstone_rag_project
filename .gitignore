@@ -18,3 +18,12 @@ __pycache__/
 
 # Logs
 *.log
+.cursor/
+
+ma_oracle.egg-info/
+# Added by code-review-graph
+.code-review-graph/
+.DS_Store
+ma_oracle.egg-info/
+.pytest_cache/
+.env
