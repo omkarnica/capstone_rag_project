@@ -20,6 +20,8 @@ LLM: gemini-2.5-flash via google-genai SDK + GCP Vertex AI
 
 from __future__ import annotations
 
+import re
+
 from google import genai
 from google.genai import types
 from pinecone import Pinecone
@@ -44,6 +46,23 @@ Rules:
 - Cite the source of every factual claim using [accession_no | period_of_report].
 - If the context is insufficient to answer, say so explicitly — do not speculate.
 - Be concise and precise. Use numbers and dates from the context directly."""
+
+_COMPANY_CANONICAL: dict[str, str] = {
+    "apple":                  "Apple Inc.",
+    "apple inc":              "Apple Inc.",
+    "microsoft":              "MICROSOFT CORP",
+    "microsoft corp":         "MICROSOFT CORP",
+    "microsoft corporation":  "MICROSOFT CORP",
+}
+
+_PUNCT_RE = re.compile(r"[^\w\s]")
+
+
+def _normalize_company(name: str) -> str:
+    """Map a free-form company name to the exact stored Pinecone value."""
+    key = _PUNCT_RE.sub("", name.lower()).strip()
+    return _COMPANY_CANONICAL.get(key, name)
+
 
 _pc: Pinecone | None = None
 _genai_client: genai.Client | None = None
@@ -77,7 +96,7 @@ def _build_filter(company: str | None, period_start: str | None, period_end: str
     conditions: list[dict] = []
 
     if company:
-        conditions.append({"company_title": {"$eq": company}})
+        conditions.append({"company_title": {"$eq": _normalize_company(company)}})
 
     if not conditions:
         return None

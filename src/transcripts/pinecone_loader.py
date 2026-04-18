@@ -31,7 +31,7 @@ from src.utils.secrets import get_secret
 
 from src.utils.exceptions import db_error_boundary
 from src.utils.logger import get_logger
-from xbrl.loader import get_connection
+from src.xbrl.loader import get_connection
 
 logger = get_logger(__name__)
 

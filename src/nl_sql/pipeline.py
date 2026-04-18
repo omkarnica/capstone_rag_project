@@ -19,7 +19,7 @@ from google.genai import types
 
 from src.utils.exceptions import DatabaseError, db_error_boundary
 from src.utils.logger import get_logger
-from xbrl.loader import get_connection
+from src.xbrl.loader import get_connection
 
 logger = get_logger(__name__)
 
@@ -55,6 +55,24 @@ Notes: tag contains raw XBRL tags e.g. 'Revenue', 'NetIncome',
 
 Example tags: Revenue, NetIncome, TotalAssets, OperatingIncome,
               StockholdersEquity, AssetsCurrent, CashAndCashEquivalentsAtCarryingValue
+
+Table: patents
+Columns: patent_id (TEXT, primary key), patent_title (TEXT),
+         assignee_organization (TEXT), grant_date (DATE, format YYYY-MM-DD),
+         cpc_codes (TEXT[], a PostgreSQL array), citation_count (INTEGER)
+Notes: Use for structured questions about patent counts, date ranges,
+       CPC code filtering, and citation ranking.
+       For CPC filtering use = ANY(cpc_codes) or && ARRAY['code']::text[], not LIKE.
+       Do NOT join patents to filings or facts — it is an independent table.
+
+Table: transcripts
+Columns: accession_no (TEXT, primary key), company_name (TEXT),
+         filed_date (DATE), period_of_report (DATE), form_type (TEXT)
+Notes: company_name is stored exactly as e.g. 'MICROSOFT CORP' or 'Apple Inc.' — use ILIKE for matching.
+       form_type values include '8-K'.
+       Use for structured questions that filter by company or date range.
+       Do NOT use for questions about transcript content — those require vector search, not SQL.
+       Do NOT join transcripts to filings or facts — it is an independent table.
 """
 
 _SYSTEM_PROMPT = """You are a SQL expert. Generate a single valid PostgreSQL query to answer \

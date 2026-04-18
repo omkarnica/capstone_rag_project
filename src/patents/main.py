@@ -26,7 +26,7 @@ from pathlib import Path
 
 from src.patents import loader, parser, reader
 from src.utils.logger import get_logger
-from xbrl.loader import get_connection
+from src.xbrl.loader import get_connection
 
 logger = get_logger(__name__)
 
