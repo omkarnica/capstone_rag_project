@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__code-review-graph__get_architecture_overview_tool"
+    ],
+    "additionalDirectories": [
+      "/Users/karnicajain/Documents/capston_rag_project/src"
+    ]
+  }
+}
