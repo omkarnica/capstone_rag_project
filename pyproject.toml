@@ -19,6 +19,8 @@ dependencies = [
     "pinecone>=8.1.2",
     "python-dotenv>=1.0.1",
     "google-cloud-secret-manager>=2.27.0",
+    "scikit-learn>=1.8.0",
+    "docling>=2.90.0",
 ]
 
 [tool.setuptools.packages.find]
