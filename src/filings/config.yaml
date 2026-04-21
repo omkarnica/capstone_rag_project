@@ -1,0 +1,33 @@
+# Chunking configuration
+# chunk_size: 300
+# overlap: 50
+# max_words: 300
+MIN_CHUNK_WORDS: 150
+MAX_CHUNK_WORDS: 450
+CHUNK_OVERLAP_WORDS: 80
+
+# Path to a Docling JSON file for quick testing
+docling_json_path: "data/aapl_10-k_docling.json"
+
+# Limit number of documents processed in main block
+max_docs: 1
+
+# Environment variable names for secrets
+
+GEMINI_PROJECT_ID_ENV: "GEMINI_PROJECT_ID"
+GEMINI_LOCATION_ENV: "GEMINI_LOCATION"
+PINECONE_API_KEY_ENV: "PINECONE_API_KEY"
+SEC_USER_AGENT_ENV: "SEC_USER_AGENT"
+
+PINECONE_INDEX_NAME: "ragcapstone"
+PINECONE_NAMESPACE: "apple"
+PINECONE_CLOUD: "aws"
+PINECONE_REGION: "us-east-1"
+PINECONE_EMBED_MODEL: "llama-text-embed-v2"
+PINECONE_RERANK_MODEL: "bge-reranker-v2-m3"
+RAPTOR_EMBED_MODEL: "all-MiniLM-L6-v2"
+RAPTOR_SUMMARY_PROVIDER: "gemini"
+RAPTOR_GEMINI_MODE: "vertex" 
+RAPTOR_SUMMARY_MODEL: "gemini-2.5-flash"
+RAPTOR_SUMMARY_FALLBACK_MODELS: "gemini-2.0-flash"
+RAPTOR_GEMINI_COOLDOWN_SECONDS: 12
