@@ -144,7 +144,7 @@ def _citation_boost_rerank(
 
 def retrieve_patents(
     query: str,
-    company: str = "Apple Inc",
+    company: str | None = None,
     grant_date_start: str | None = None,
     grant_date_end: str | None = None,
     top_k: int = 15,
@@ -291,7 +291,7 @@ def _build_patent_context(hits: list[dict]) -> str:
 
 def generate_patent_answer(
     query: str,
-    company: str = "Apple Inc",
+    company: str | None = None,
     grant_date_start: str | None = None,
     grant_date_end: str | None = None,
 ) -> dict:
