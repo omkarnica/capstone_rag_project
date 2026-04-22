@@ -20,7 +20,7 @@ load_dotenv()
 logger = get_logger(__name__)
 
 # ── Pinecone config ────────────────────────────────────────────────────────────
-PINECONE_API_KEY  = os.environ["PINECONE_API_KEY"]
+PINECONE_API_KEY  = get_secret("PINECONE_API_KEY")
 INDEX_NAME        = "ragcapstone"
 NAMESPACE         = "patents"
 EMBED_MODEL       = "llama-text-embed-v2"

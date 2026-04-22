@@ -23,6 +23,8 @@ LLM: gemini-2.5-flash via google-genai SDK + GCP Vertex AI
 
 from __future__ import annotations
 
+import re
+
 from google import genai
 from google.genai import types
 from pinecone import Pinecone
@@ -48,6 +50,24 @@ Rules:
 - If the context is insufficient to answer, say so explicitly — do not speculate.
 - Be precise about claim scope, CPC classifications, and grant dates.
 - Summarize patterns across multiple patents where relevant."""
+
+_COMPANY_CANONICAL: dict[str, str] = {
+    "apple":                 "Apple Inc",
+    "apple inc":             "Apple Inc",
+    "apple inc.":            "Apple Inc",
+    "microsoft":             "MICROSOFT CORP",
+    "microsoft corp":        "MICROSOFT CORP",
+    "microsoft corporation": "MICROSOFT CORP",
+}
+
+_PUNCT_RE = re.compile(r"[^\w\s]")
+
+
+def _normalize_company(name: str) -> str:
+    """Map a free-form company name to the exact stored Pinecone value."""
+    key = _PUNCT_RE.sub("", name.lower()).strip()
+    return _COMPANY_CANONICAL.get(key, name)
+
 
 _pc: Pinecone | None = None
 _genai_client: genai.Client | None = None
@@ -85,7 +105,7 @@ def _build_filter(
     conditions: list[dict] = []
 
     if company:
-        conditions.append({"company_title": {"$eq": company}})
+        conditions.append({"company_title": {"$eq": _normalize_company(company)}})
 
     if grant_date_start and grant_date_end:
         conditions.append({"grant_date": {"$gte": grant_date_start}})
@@ -144,7 +164,7 @@ def _citation_boost_rerank(
 
 def retrieve_patents(
     query: str,
-    company: str = "Apple Inc",
+    company: str | None = None,
     grant_date_start: str | None = None,
     grant_date_end: str | None = None,
     top_k: int = 15,
@@ -291,7 +311,7 @@ def _build_patent_context(hits: list[dict]) -> str:
 
 def generate_patent_answer(
     query: str,
-    company: str = "Apple Inc",
+    company: str | None = None,
     grant_date_start: str | None = None,
     grant_date_end: str | None = None,
 ) -> dict:
