@@ -369,7 +369,8 @@ Per architecture diagram — noted but not implemented here:
 - **LangSmith / LangFuse observability** — separate integration PR
 - **Audit log** (query_id, tenant_id, sources, tokens/cost) — separate PR
 - **Slack webhook notifications** — separate PR
-- **BM25 hybrid search** — Pinecone hosted inference handles dense today; BM25 is additive
+
+> **Note:** BM25 hybrid search was delivered early in this branch via `src/utils/hybrid.py` — integrated into filings, litigation, and patents retrieval.
 
 ---
 
@@ -381,24 +382,55 @@ Per architecture diagram — noted but not implemented here:
 | `src/cache/__init__.py` | New — factory for `RedisCacheBackend` (fix syntax bug from download) |
 | `src/cache/base.py` | New — copy `CacheBackend` ABC as-is |
 | `src/cache/embedding_cache.py` | New — copy + fix `..config` imports → `src.utils.secrets` |
-| `src/cache/redis_backend.py` | New — copy + fix `REDIS_URL` import → `os.getenv` |
-| `src/cache/semantic_cache.py` | New — adapter: `SemanticCache` / `compute_corpus_version` / `is_time_sensitive_question` |
+| `src/cache/redis_backend.py` | New — copy + fix `REDIS_URL` import → `os.getenv`; `__init__` degrades gracefully when Redis unavailable |
+| `src/cache/semantic_cache.py` | New — adapter: `SemanticCache` / `compute_corpus_version` / `is_time_sensitive_question`; stores full result payload (not just answer string); handles Redis unavailability without crashing |
+| `src/utils/hybrid.py` | New — BM25 + RRF hybrid ranking utility used across filings, litigation, patents |
 | `src/model_config.py` | Replace OpenAI/LangChain with ChatVertexAI (GCP creds) |
 | `src/state.py` | Add `company`, `period`, `source_type`, `data_source_result`, `contradiction_report`; update route Literal |
 | `src/nodes/router.py` | Full rewrite for M&A route types |
-| `src/nodes/retriever.py` | Replace `ingestion.indexer` with M&A retrieval dispatch |
-| `src/graph.py` | Add `contradiction_check` node, update conditional edges |
-| `src/nodes/generator.py` | Update system prompt for M&A context |
+| `src/nodes/retriever.py` | Replace `ingestion.indexer` with M&A retrieval dispatch; all 5 branches wrapped in `try/except` with empty-docs fallback |
+| `src/graph.py` | Add `contradiction_check` node; extract quarter token from `period` and forward to `run_due_diligence`; update conditional edges |
+| `src/nodes/generator.py` | Update system prompt for M&A context; update `_answer_style_instructions` with M&A-relevant phrases |
 | `src/nodes/planner.py` | Replace Claude course heuristics with M&A source topics |
-| `src/api.py` | Minor — forward `company`/`period` to graph state |
-| `src/app.py` | Add `/due-diligence` endpoint, update title |
+| `src/nodes/fallback.py` | Rewritten — replace Brave Search with Google CSE; replace Anthropic domain trust with SEC/USPTO/CourtListener domain scoring; route-aware query rewriter |
+| `src/api.py` | Forward `company`/`period` to graph state; cache-scoped keys; `contradiction_report` in output |
+| `src/app.py` | Add `/due-diligence` endpoint with input validation (`fiscal_year` in [2000,2030], non-empty `company`); update title |
+| `src/filings/raptor_retrieval.py` | Integrate `hybrid_rrf_rank` replacing rerank fallback chain |
+| `src/litigation/retrieval.py` | Integrate `hybrid_rrf_rank` replacing `bge-reranker-v2-m3` API calls |
+| `src/patents/retrieval.py` | Integrate `hybrid_rrf_rank` replacing citation-boost reranker |
+| `src/transcripts/retrieval.py` | Minor updates |
+
+**New demo scripts** (call live services — not unit tests, not collected by pytest):
+- `src/nodes/demo_adaptive.py`, `demo_graph.py`, `demo_retriever.py`, `demo_router.py`
+- `src/patents/demo_patents.py`, `src/transcripts/demo_transcript.py`
+
+**New tests:**
+- `tests/test_hybrid.py` — unit tests for `hybrid_rrf_rank`
 
 **Files unchanged** (already correct for M&A Oracle):
-- `src/nodes/grader.py`, `src/nodes/merge.py`, `src/nodes/rewriter.py`, `src/nodes/fallback.py`
+- `src/nodes/grader.py`, `src/nodes/merge.py`, `src/nodes/rewriter.py`
 - `src/tiering.py`
-- `src/transcripts/retrieval.py`, `src/patents/retrieval.py`, `src/litigation/retrieval.py`
-- `src/filings/raptor_retrieval.py`, `src/nl_sql/pipeline.py`, `src/contradictions/detector.py`
-- `src/utils/`, `src/xbrl/`
+- `src/nl_sql/pipeline.py`, `src/contradictions/detector.py`
+- `src/xbrl/`
+
+**Deleted** (were live-service demos masquerading as tests, invisible to pytest anyway):
+- `src/nodes/adaptive_test.py`, `graph_test.py`, `retriever_test.py`, `router_test.py`
+- `src/patents/test_patents.py`, `src/transcripts/test_transcript.py`
+
+---
+
+## Post-Review Fixes (applied 2026-04-24)
+
+Issues caught by code review before merge, fixed on the same branch:
+
+| # | File | Fix |
+|---|---|---|
+| 1 | `src/cache/semantic_cache.py` | `store()` serializes full result dict; `get_similar()` restores it — cache hits return complete payloads, not sparse `{answer, sources_json}` |
+| 2 | `src/graph.py` | `run_contradiction_check` extracts quarter token (Q1/Q2/Q3/Q4/FY) from `period` and passes it to `run_due_diligence()` |
+| 3 | `src/nodes/retriever.py` | All 5 retrieval branches wrapped in `try/except`; failures log warning and return `docs = []` so corrective-RAG rewrite/fallback path proceeds |
+| 4 | `src/nodes/generator.py` | Removed stale Claude-course phrases (`"syllabus"`, `"covers"`, `"what courses"`) from `_answer_style_instructions`; replaced with M&A-relevant phrases |
+| 5 | `src/cache/redis_backend.py` + `semantic_cache.py` | Redis connection failure in `__init__` no longer crashes; `_get_backend()` returns `None`; all cache methods degrade gracefully |
+| 6 | `src/app.py` | `DueDiligenceRequest` validates `fiscal_year` in [2000, 2030] and `company` non-empty via Pydantic `Field` constraints |
 
 ---
 
