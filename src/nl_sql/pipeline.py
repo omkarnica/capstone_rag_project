@@ -15,24 +15,14 @@ DB:  PostgreSQL, get_connection() from xbrl/loader.py
 
 from __future__ import annotations
 
-from google import genai
 from google.genai import types
 
+from src.model_config import get_genai_client, get_model_name
 from src.utils.exceptions import DatabaseError, db_error_boundary
 from src.utils.logger import get_logger
 from src.xbrl.loader import get_connection
 
 logger = get_logger(__name__)
-
-_GCP_PROJECT  = "codelab-2-485215"
-_GCP_LOCATION = "us-central1"
-_MODEL        = "gemini-2.5-flash"
-
-_client = genai.Client(
-    vertexai=True,
-    project=_GCP_PROJECT,
-    location=_GCP_LOCATION,
-)
 
 _SCHEMA = """
 Table: filings
@@ -113,8 +103,8 @@ def _call_llm(messages: list[dict]) -> str:
         system_instruction=system_content,
     ) if system_content else None
 
-    response = _client.models.generate_content(
-        model=_MODEL,
+    response = get_genai_client().models.generate_content(
+        model=get_model_name(),
         contents=user_content,
         config=config,
     )
@@ -202,7 +192,7 @@ def _synthesize_answer(question: str, sql: str, columns: list[str], rows: list[t
         "Use plain numbers with commas. If multiple rows exist, summarize them.\n"
         "If the result is a single financial figure, state it directly."
     )
-    response = _client.models.generate_content(model=_MODEL, contents=prompt)
+    response = get_genai_client().models.generate_content(model=get_model_name(), contents=prompt)
     answer = (response.text or "").strip()
     logger.info("Synthesized answer", extra={"question": question, "answer": answer})
     return answer

@@ -20,6 +20,7 @@ dependencies = [
     "pinecone>=8.1.2",
     "python-dotenv>=1.0.1",
     "google-cloud-secret-manager>=2.27.0",
+    "google-cloud-bigquery>=3.25.0",
     "rank-bm25>=0.2.2",
     "scikit-learn>=1.8.0",
     "docling>=2.90.0",

@@ -19,6 +19,7 @@ __pycache__/
 # Logs
 *.log
 .cursor/
+.claude/settings.local.json
 
 ma_oracle.egg-info/
 # Added by code-review-graph
