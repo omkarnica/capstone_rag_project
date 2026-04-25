@@ -156,16 +156,18 @@ def run_single_question(
     route_hint: str | None = None,
     force_route: bool = False,
     chunking_strategy: str = "hierarchical",
+    company: str | None = None,
+    period: str | None = None,
 ) -> dict:
     """
-    Run one question through the existing LangGraph pipeline.
+    Run one question through the M&A Oracle LangGraph pipeline.
     """
     graph = get_graph()
 
     state = {
         "question": question,
         "max_iterations": 3,
-        "max_retrieval_attempts": 1,
+        "max_retrieval_attempts": 3,
         "chunking_strategy": chunking_strategy,
     }
 
@@ -173,6 +175,10 @@ def run_single_question(
         state["route_hint"] = route_hint
     if force_route:
         state["force_route"] = True
+    if company:
+        state["company"] = company
+    if period:
+        state["period"] = period
 
     result = graph.invoke(state)
     single_tier = tier_for_single_route(result.get("route"))
@@ -197,7 +203,40 @@ def run_single_question(
         "retrieved_contexts": retrieved_contexts,
         "retrieved_context_count": len(retrieved_contexts),
         "chunking_strategy": chunking_strategy,
+        "contradiction_report": result.get("contradiction_report", []),
+        "company": result.get("company"),
+        "period": result.get("period"),
     }
+
+
+def _cache_scoped_question(
+    question: str,
+    *,
+    company: str | None = None,
+    period: str | None = None,
+) -> str:
+    scope_parts = []
+    if company:
+        scope_parts.append(f"company={company}")
+    if period:
+        scope_parts.append(f"period={period}")
+    if not scope_parts:
+        return question
+    return f"{question}\nContext: {'; '.join(scope_parts)}"
+
+
+def _cache_scope(
+    chunking_strategy: str,
+    *,
+    company: str | None = None,
+    period: str | None = None,
+) -> str:
+    scope_parts = [chunking_strategy]
+    if company:
+        scope_parts.append(f"company={company.lower()}")
+    if period:
+        scope_parts.append(f"period={period.lower()}")
+    return "|".join(scope_parts)
 
 
 def run_adaptive_query(
@@ -205,6 +244,8 @@ def run_adaptive_query(
     chunking_strategy: str = "hierarchical",
     similarity_threshold: float = 0.92,
     use_cache: bool = True,
+    company: str | None = None,
+    period: str | None = None,
 ) -> dict:
     """
     Adaptive wrapper:
@@ -217,15 +258,17 @@ def run_adaptive_query(
     corpus_version = compute_corpus_version(
         chunking_strategy=chunking_strategy
     )
+    cache_question = _cache_scoped_question(question, company=company, period=period)
+    cache_scope = _cache_scope(chunking_strategy, company=company, period=period)
 
     cache_allowed = use_cache and not is_time_sensitive_question(question)
 
     if cache_allowed:
         cache = get_cache()
         cached = cache.get_similar(
-            question=question,
+            question=cache_question,
             corpus_version=corpus_version,
-            chunking_strategy=chunking_strategy,
+            chunking_strategy=cache_scope,
             similarity_threshold=similarity_threshold,
         )
         if cached is not None:
@@ -247,6 +290,8 @@ def run_adaptive_query(
             route_hint=plan["subquestions"][0].get("route_hint"),
             force_route=False,
             chunking_strategy=chunking_strategy,
+            company=company,
+            period=period,
         )
 
         final_result = {
@@ -264,6 +309,8 @@ def run_adaptive_query(
             "cache_similarity": None,
             "cache_source_question": None,
             "chunking_strategy": chunking_strategy,
+            "company": company,
+            "period": period,
         }
 
     else:
@@ -274,6 +321,8 @@ def run_adaptive_query(
                 route_hint=subq.get("route_hint"),
                 force_route=True,
                 chunking_strategy=chunking_strategy,
+                company=company,
+                period=period,
             )
             sub_results.append(result)
 
@@ -295,16 +344,18 @@ def run_adaptive_query(
             "cache_similarity": None,
             "cache_source_question": None,
             "chunking_strategy": chunking_strategy,
+            "company": company,
+            "period": period,
         }
 
     # Store only stable queries in semantic cache
     if cache_allowed:
         cache = get_cache()
         cache.store(
-            question=question,
+            question=cache_question,
             result=final_result,
             corpus_version=corpus_version,
-            chunking_strategy=chunking_strategy,
+            chunking_strategy=cache_scope,
         )
 
     return _finalize_result_metadata(

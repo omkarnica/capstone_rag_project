@@ -1,81 +1,114 @@
 from __future__ import annotations
 
-from langchain_core.documents import Document
-
-from src.ingestion.indexer import load_vectorstore, load_parent_store
 from src.state import GraphState
+from src.utils.logger import get_logger
 
-
-def _doc_to_dict(doc: Document) -> dict:
-    return {
-        "content": doc.page_content,
-        "metadata": doc.metadata,
-    }
-
-
-def _hydrate_parents_from_children(child_docs: list[Document]) -> list[dict]:
-    """
-    Convert retrieved child chunks into unique parent documents using parent_id.
-    """
-    parent_store = load_parent_store()
-    hydrated_parents = []
-    seen_parent_ids = set()
-
-    for child_doc in child_docs:
-        metadata = child_doc.metadata or {}
-        parent_id = metadata.get("parent_id")
-
-        if not parent_id:
-            # Fallback: return the child itself if no parent_id exists
-            hydrated_parents.append(_doc_to_dict(child_doc))
-            continue
-
-        if parent_id in seen_parent_ids:
-            continue
-
-        seen_parent_ids.add(parent_id)
-
-        parent_payload = parent_store.get(parent_id)
-        if not parent_payload:
-            # Fallback: child chunk if parent store entry missing
-            hydrated_parents.append(_doc_to_dict(child_doc))
-            continue
-
-        hydrated_parents.append(
-            {
-                "content": parent_payload["page_content"],
-                "metadata": parent_payload["metadata"],
-            }
-        )
-
-    return hydrated_parents
+logger = get_logger(__name__)
 
 
 def retrieve_docs(state: GraphState) -> GraphState:
-    """
-    Retrieve documents from the vectorstore.
-
-    recursive mode:
-        returns retrieved chunks directly
-
-    hierarchical mode:
-        retrieves child chunks, then hydrates parent documents
-    """
+    """Dispatch retrieval to the appropriate M&A data source based on route."""
+    route = state.get("route", "llm_direct")
     query = state.get("rewritten_question") or state["question"]
-    strategy = state.get("chunking_strategy", "hierarchical")
+    company = state.get("company")
+    docs: list[dict] = []
 
-    vectorstore = load_vectorstore(strategy=strategy)
-    docs = vectorstore.similarity_search(query, k=4)
+    if route == "sql":
+        try:
+            from src.nl_sql.pipeline import ask as nl_sql_ask
+            result = nl_sql_ask(query)
+            docs = [{
+                "content": result.get("answer", ""),
+                "metadata": {
+                    "source": "XBRL/SQL",
+                    "sql": result.get("sql", ""),
+                },
+            }]
+        except Exception as exc:
+            logger.warning("SQL retrieval failed: %s", exc)
 
-    if strategy == "hierarchical":
-        retrieved_docs = _hydrate_parents_from_children(docs)
-    else:
-        retrieved_docs = [_doc_to_dict(doc) for doc in docs]
+    elif route == "filings":
+        try:
+            from src.filings.raptor_retrieval import raptor_retrieve
+            result = raptor_retrieve(query, top_k=10, final_top_k=6)
+            docs = [
+                {
+                    "content": c.get("text", ""),
+                    "metadata": {
+                        "source": "SEC Filing",
+                        "form_type": c.get("form_type"),
+                        "rank": c.get("rank"),
+                    },
+                }
+                for c in result.get("contexts", [])
+            ]
+        except Exception as exc:
+            logger.warning("Filings retrieval failed: %s", exc)
+
+    elif route == "transcripts":
+        try:
+            from src.transcripts.retrieval import retrieve_transcripts
+            hits = retrieve_transcripts(query, company=company)
+            docs = [
+                {
+                    "content": h.get("fields", {}).get("text", ""),
+                    "metadata": {
+                        "source": "Earnings Transcript",
+                        "company": h.get("fields", {}).get("company_title"),
+                        "period": h.get("fields", {}).get("period_of_report"),
+                        "accession_no": h.get("fields", {}).get("accession_no"),
+                    },
+                }
+                for h in hits
+            ]
+        except Exception as exc:
+            logger.warning("Transcripts retrieval failed: %s", exc)
+
+    elif route == "patents":
+        try:
+            from src.patents.retrieval import retrieve_patents
+            hits = retrieve_patents(query, company=company)
+            docs = [
+                {
+                    "content": h.get("fields", {}).get("text", ""),
+                    "metadata": {
+                        "source": "Patent",
+                        "patent_id": h.get("fields", {}).get("patent_id"),
+                        "patent_title": h.get("fields", {}).get("patent_title"),
+                        "grant_date": h.get("fields", {}).get("grant_date"),
+                    },
+                }
+                for h in hits
+            ]
+        except Exception as exc:
+            logger.warning("Patents retrieval failed: %s", exc)
+
+    elif route == "litigation":
+        try:
+            from src.litigation.retrieval import retrieve_litigation
+            hits = retrieve_litigation(query, company=company)
+            docs = [
+                {
+                    "content": h.get("fields", {}).get("text", ""),
+                    "metadata": {
+                        "source": "Litigation",
+                        "case_name": h.get("fields", {}).get("case_name"),
+                        "court": h.get("fields", {}).get("court"),
+                        "date_filed": h.get("fields", {}).get("date_filed"),
+                    },
+                }
+                for h in hits
+            ]
+        except Exception as exc:
+            logger.warning("Litigation retrieval failed: %s", exc)
+
+    # graph, contradiction, llm_direct — no retrieval here
+    # contradiction is handled by its own node; graph is a stub
 
     return {
         **state,
         "retrieval_query": query,
-        "retrieved_docs": retrieved_docs,
+        "retrieved_docs": docs,
         "filtered_docs": [],
         "doc_relevance": [],
         "relevant_doc_count": 0,

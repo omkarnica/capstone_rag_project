@@ -4,18 +4,27 @@ from src.tiering import tier_for_single_route, tier_label
 graph = build_graph()
 
 questions = [
-    "What is a professional certification?",
-    "What does the Claude certification exam guide cover?",
-    "Has there been any Professional Claude certification launched recently ? What is the syllabus for this exam?",
+    {
+        "question": "What was Apple total revenue for fiscal year 2024?",
+        "company": "Apple Inc.",
+        "period": "FY 2024",
+    },
+    {
+        "question": "What patents does Apple have related to on-device AI?",
+        "company": "Apple Inc",
+        "period": "2024",
+    },
 ]
 
-for q in questions:
+for item in questions:
     print("=" * 100)
-    print("QUESTION:", q)
+    print("QUESTION:", item["question"])
 
     result = graph.invoke(
         {
-            "question": q,
+            "question": item["question"],
+            "company": item["company"],
+            "period": item["period"],
             "max_iterations": 3,
             "max_retrieval_attempts": 1,
             "chunking_strategy": "hierarchical",

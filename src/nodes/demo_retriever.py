@@ -1,9 +1,9 @@
 from src.nodes.retriever import retrieve_docs
 
-question = "What does the Claude certification page say about the duration and format of the exam?"
-
 state = {
-    "question": question,
+    "question": "What patents does Apple have related to on-device AI?",
+    "route": "patents",
+    "company": "Apple Inc",
     "chunking_strategy": "hierarchical",
 }
 
@@ -11,7 +11,7 @@ result = retrieve_docs(state)
 
 print("=" * 80)
 print("QUESTION:")
-print(question)
+print(state["question"])
 print("=" * 80)
 
 print(f"\nRetrieved: {len(result['retrieved_docs'])} docs\n")

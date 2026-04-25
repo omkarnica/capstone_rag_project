@@ -1,10 +1,12 @@
+#this is the Entry point for Litigation retrival 
+
 """
 Litigation retrieval pipeline for M&A Oracle RAG system.
 
 retrieve_litigation:
     Searches the Pinecone 'litigation' namespace using integrated inference.
     Optionally filters by company_name and date_filed range (Python post-filter).
-    Reranks with bge-reranker-v2-m3, falling back to score-sorted order.
+    Final ranking uses dense vector rank plus BM25 keyword rank fused with RRF.
 
 generate_litigation_answer:
     Calls retrieve_litigation, builds a numbered context string (max 10000 chars),
@@ -13,7 +15,7 @@ generate_litigation_answer:
 
 Pinecone index: ragcapstone, namespace: litigation
 Embedding: llama-text-embed-v2 (Pinecone hosted inference)
-Reranker: bge-reranker-v2-m3 via pc.inference.rerank()
+Hybrid ranking: dense vector search + BM25 + RRF
 LLM: gemini-2.5-flash via google-genai SDK + GCP Vertex AI
 """
 
@@ -25,6 +27,7 @@ from google import genai
 from google.genai import types
 from pinecone import Pinecone
 
+from src.utils.hybrid import hybrid_rrf_rank
 from src.utils.logger import get_logger
 from src.utils.secrets import get_secret
 
@@ -32,7 +35,6 @@ logger = get_logger(__name__)
 
 _INDEX_NAME        = "ragcapstone"
 _NAMESPACE         = "litigation"
-_RERANK_MODEL      = "bge-reranker-v2-m3"
 _GCP_PROJECT       = "codelab-2-485215"
 _GCP_LOCATION      = "us-central1"
 _LLM_MODEL         = "gemini-2.5-flash"
@@ -102,17 +104,17 @@ def retrieve_litigation(
     top_k: int = 10,
 ) -> list[dict]:
     """
-    Search the litigation namespace and return reranked hits.
+    Search the litigation namespace and return hybrid-ranked hits.
 
     Args:
         query:      Natural-language question about litigation.
         company:    Exact company_name value, or None for all.
         date_start: ISO date lower bound on date_filed, e.g. "2018-01-01".
         date_end:   ISO date upper bound on date_filed, e.g. "2024-12-31".
-        top_k:      Number of candidates to fetch before reranking.
+        top_k:      Number of candidates to fetch and return after RRF.
 
     Returns:
-        List of hit dicts ordered by rerank score descending.
+        List of hit dicts ordered by dense-vector + BM25 RRF score.
         Each dict has '_id', '_score', and 'fields' (metadata).
     """
     pc    = _get_pinecone()
@@ -161,32 +163,15 @@ def retrieve_litigation(
         if not hits:
             return []
 
-    # Rerank
-    try:
-        documents = [
-            f"Case: {h['fields'].get('case_name', '')} | "
-            f"Court: {h['fields'].get('court_citation', '')} | "
-            f"Date: {h['fields'].get('date_filed', '')} | "
-            f"{h['fields'].get('text', '')[:300]}"
-            for h in hits
-        ]
-        rerank_result = pc.inference.rerank(
-            model=_RERANK_MODEL,
-            query=query,
-            documents=documents,
-            top_n=top_k,
-            return_documents=False,
-        )
-        reranked_indices = [item.index for item in rerank_result.data]
-        hits = [hits[i] for i in reranked_indices]
-        rerank_method = "bge-reranker-v2-m3"
-    except Exception as exc:
-        logger.warning(
-            "Reranking failed — using score-sorted order",
-            extra={"error": str(exc)},
-        )
-        hits = sorted(hits, key=lambda h: h.get("_score", 0.0), reverse=True)
-        rerank_method = "score-sorted (fallback)"
+    dense_ranked_hits = sorted(hits, key=lambda h: h.get("_score", 0.0), reverse=True)
+    hits = hybrid_rrf_rank(
+        query,
+        dense_ranked_hits,
+        text_getter=lambda h: h.get("fields", {}).get("text", ""),
+        key=lambda h: h.get("_id") or h.get("id") or "",
+        top_k=top_k,
+    )
+    rerank_method = "dense-vector + BM25 RRF"
 
     logger.info(
         "Litigation retrieval complete",

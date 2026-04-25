@@ -117,7 +117,7 @@ def test_pipeline_result_captures_failed_quarters() -> None:
     When download_and_extract raises a MAOracleError, run_all_quarters must
     record a failed PipelineResult for that quarter and continue with the rest.
     """
-    from xbrl.main import QUARTERS, run_all_quarters
+    from src.xbrl.main import QUARTERS, run_all_quarters
 
     failing_quarter = QUARTERS[0]
 
@@ -131,7 +131,7 @@ def test_pipeline_result_captures_failed_quarters() -> None:
         # For all other quarters, also fail quickly so the test stays fast
         raise DownloadError("Fast-fail", url="https://sec.gov/fake.zip")
 
-    with patch("xbrl.main.download_and_extract", side_effect=fake_download):
+    with patch("src.xbrl.main.download_and_extract", side_effect=fake_download):
         results = run_all_quarters(extract_dir=Path("/tmp/test_quarters"))
 
     # Every quarter should have a result
@@ -150,7 +150,7 @@ def test_pipeline_result_captures_success() -> None:
     """
     A quarter that completes successfully must record filings and facts counts.
     """
-    from xbrl.main import QUARTERS, run_all_quarters
+    from src.xbrl.main import QUARTERS, run_all_quarters
 
     target = QUARTERS[0]
 
@@ -165,8 +165,8 @@ def test_pipeline_result_captures_success() -> None:
         return 42, 1000  # filings, facts
 
     with (
-        patch("xbrl.main.download_and_extract", side_effect=fake_download),
-        patch("xbrl.main.run_pipeline", side_effect=fake_pipeline),
+        patch("src.xbrl.main.download_and_extract", side_effect=fake_download),
+        patch("src.xbrl.main.run_pipeline", side_effect=fake_pipeline),
     ):
         results = run_all_quarters(extract_dir=Path("/tmp/test_quarters"))
 

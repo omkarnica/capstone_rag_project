@@ -87,15 +87,15 @@ def _answer_style_instructions(question: str, *, direct: bool = False) -> str:
     asks_for_multiple_items = any(
         phrase in lowered
         for phrase in (
-            "what does",
-            "what do",
-            "what topics",
-            "what courses",
-            "what response format",
-            "what is the syllabus",
-            "cover",
-            "covers",
+            "what are",
             "list",
+            "what patents",
+            "what lawsuits",
+            "what risk factors",
+            "what metrics",
+            "what did management",
+            "enumerate",
+            "summarize all",
         )
     )
 
@@ -173,16 +173,13 @@ def generate_answer(state: GraphState) -> GraphState:
         }
 
     prompt = f"""
-You are a grounded RAG assistant.
+You are a forensic financial analyst assistant for M&A due diligence.
 
-Answer the user's question using ONLY the provided context.
-Do not invent facts.
-If the context is insufficient, say so clearly.
-
-If the context comes from web results:
-- prioritize official Anthropic sources
-- do not rely on third-party speculation
-- if official support is weak or missing, explicitly say the answer is not fully verified
+Answer the user's question using ONLY the provided context from SEC filings, earnings transcripts, patents, or litigation records.
+Do not invent facts or speculate beyond the evidence.
+Cite every factual claim with [source | date] format.
+Flag any material risks or anomalies explicitly.
+If the context is insufficient, say so clearly in one sentence.
 
 Output rules:
 {_answer_style_instructions(question)}
@@ -213,9 +210,9 @@ def generate_direct_answer(state: GraphState) -> GraphState:
     llm = get_direct_generation_llm()
 
     prompt = f"""
-You are a helpful assistant.
+You are a knowledgeable M&A and finance expert.
 
-Answer the question directly.
+Answer the question directly using your knowledge of M&A processes, financial analysis, and due diligence best practices.
 Be accurate, concise, and clear.
 Do not claim to use documents or external search.
 

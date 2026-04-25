@@ -1,11 +1,12 @@
+#This is the main retrieval entry point for Transcipts dat
 """
 Transcript retrieval pipeline for M&A Oracle RAG system.
 
 retrieve_transcripts:
     Searches the Pinecone 'transcripts' namespace using integrated inference
     (index.search() with raw text). Optionally filters by company_title and
-    period_of_report date range. Reranks with bge-reranker-v2-m3, falling
-    back to score-sorted order if reranking fails.
+    period_of_report date range. Final ranking uses dense vector rank plus
+    BM25 keyword rank fused with Reciprocal Rank Fusion (RRF).
 
 generate_transcript_answer:
     Calls retrieve_transcripts, builds a numbered context string (max 10000
@@ -14,7 +15,7 @@ generate_transcript_answer:
 
 Pinecone index: ragcapstone, namespace: transcripts
 Embedding: llama-text-embed-v2 (Pinecone hosted inference)
-Reranker: bge-reranker-v2-m3 via pc.inference.rerank()
+Hybrid ranking: dense vector search + BM25 + RRF
 LLM: gemini-2.5-flash via google-genai SDK + GCP Vertex AI
 """
 
@@ -26,6 +27,7 @@ from google import genai
 from google.genai import types
 from pinecone import Pinecone
 
+from src.utils.hybrid import hybrid_rrf_rank
 from src.utils.logger import get_logger
 from src.utils.secrets import get_secret
 
@@ -33,7 +35,6 @@ logger = get_logger(__name__)
 
 _INDEX_NAME   = "ragcapstone"
 _NAMESPACE    = "transcripts"
-_RERANK_MODEL = "bge-reranker-v2-m3"
 _GCP_PROJECT  = "codelab-2-485215"
 _GCP_LOCATION = "us-central1"
 _LLM_MODEL    = "gemini-2.5-flash"
@@ -113,22 +114,22 @@ def retrieve_transcripts(
     top_k: int = 10,
 ) -> list[dict]:
     """
-    Search the transcripts namespace and return reranked hits.
+    Search the transcripts namespace and return hybrid-ranked hits.
 
     Uses Pinecone integrated inference for vector search (no local embedding).
     Applies metadata filters on company_title and period_of_report.
-    Reranks with bge-reranker-v2-m3; falls back to score-sorted order on error.
+    Final ranking combines Pinecone dense rank and BM25 keyword rank with RRF.
 
     Args:
         query:        Natural-language question to search for.
         company:      Exact company_title value, e.g. "Apple Inc." or None for all.
         period_start: ISO date lower bound on period_of_report, e.g. "2022-01-01".
         period_end:   ISO date upper bound on period_of_report, e.g. "2024-12-31".
-        top_k:        Number of candidates to fetch before reranking.
+        top_k:        Number of candidates to fetch and return after RRF.
 
     Returns:
         List of hit dicts, each containing '_id', '_score', and 'fields' (metadata).
-        Ordered by rerank score descending.
+        Ordered by dense-vector + BM25 RRF score.
     """
     pc    = _get_pinecone()
     index = pc.Index(_INDEX_NAME)
@@ -179,34 +180,15 @@ def retrieve_transcripts(
         if not hits:
             return []
 
-    # Rerank
-    try:
-        # Build documents list from the text used at index time (reconstructed
-        # from metadata since Pinecone integrated inference doesn't return the
-        # original text field in search results).
-        documents = [
-            f"Filing: {h['fields'].get('accession_no', '')} "
-            f"Period: {h['fields'].get('period_of_report', '')} "
-            f"Company: {h['fields'].get('company_title', '')}"
-            for h in hits
-        ]
-        rerank_result = pc.inference.rerank(
-            model=_RERANK_MODEL,
-            query=query,
-            documents=documents,
-            top_n=top_k,
-            return_documents=False,
-        )
-        reranked_indices = [item.index for item in rerank_result.data]
-        hits = [hits[i] for i in reranked_indices]
-        rerank_method = "bge-reranker-v2-m3"
-    except Exception as exc:
-        logger.warning(
-            "Reranking failed — using score-sorted order",
-            extra={"error": str(exc)},
-        )
-        hits = sorted(hits, key=lambda h: h.get("_score", 0.0), reverse=True)
-        rerank_method = "score-sorted (fallback)"
+    dense_ranked_hits = sorted(hits, key=lambda h: h.get("_score", 0.0), reverse=True)
+    hits = hybrid_rrf_rank(
+        query,
+        dense_ranked_hits,
+        text_getter=lambda h: h.get("fields", {}).get("text", ""),
+        key=lambda h: h.get("_id") or h.get("id") or "",
+        top_k=top_k,
+    )
+    rerank_method = "dense-vector + BM25 RRF"
 
     logger.info(
         "Transcript retrieval complete",
