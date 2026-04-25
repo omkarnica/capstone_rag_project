@@ -1,12 +1,12 @@
+#This is the main entry point for patents retrival
 """
 Patent retrieval pipeline for M&A Oracle RAG system.
 
 retrieve_patents:
     Searches the Pinecone 'patents' namespace using integrated inference
     (index.search() with raw text). Optionally filters by company_title and
-    grant_date range. Applies a citation-boost reranking step:
-        final_score = 0.7 * semantic_score + 0.3 * (citation_count / max_citation_count)
-    Falls back to score-sorted order if bge-reranker-v2-m3 reranking fails.
+    grant_date range. Final ranking uses dense vector rank plus BM25 keyword
+    rank fused with Reciprocal Rank Fusion (RRF).
 
 generate_patent_answer:
     Calls retrieve_patents, builds a numbered context string (max 10000 chars),
@@ -17,7 +17,7 @@ Pinecone index: ragcapstone, namespace: patents
 Embedding: llama-text-embed-v2 (Pinecone hosted inference)
   Indexed text format per chunk:
     Patent: {title}\\nCPC Codes: {cpc_codes}\\nGrant Date: {grant_date}\\nClaim 1: {claim_text}
-Reranker: bge-reranker-v2-m3 via pc.inference.rerank() + citation boost
+Hybrid ranking: dense vector search + BM25 + RRF
 LLM: gemini-2.5-flash via google-genai SDK + GCP Vertex AI
 """
 
@@ -29,6 +29,7 @@ from google import genai
 from google.genai import types
 from pinecone import Pinecone
 
+from src.utils.hybrid import hybrid_rrf_rank
 from src.utils.logger import get_logger
 from src.utils.secrets import get_secret
 
@@ -36,7 +37,6 @@ logger = get_logger(__name__)
 
 _INDEX_NAME   = "ragcapstone"
 _NAMESPACE    = "patents"
-_RERANK_MODEL = "bge-reranker-v2-m3"
 _GCP_PROJECT  = "codelab-2-485215"
 _GCP_LOCATION = "us-central1"
 _LLM_MODEL    = "gemini-2.5-flash"
@@ -122,46 +122,6 @@ def _build_filter(
     return {"$and": conditions}
 
 
-def _citation_boost_rerank(
-    hits: list[dict],
-    semantic_scores: list[float],
-    final_top_k: int,
-) -> list[dict]:
-    """
-    Blend semantic score with citation count into a final ranking score.
-
-    Formula: final_score = 0.7 * semantic_score + 0.3 * (citation_count / max_citation_count)
-
-    Citation count is read from the 'citation_count' metadata field.
-    If max_citation_count is 0, the citation term is omitted (weight falls to semantic only).
-
-    Args:
-        hits:           Hit dicts from Pinecone search or initial reranking.
-        semantic_scores: Normalized semantic scores aligned with hits list.
-        final_top_k:    Number of hits to return after boosting.
-
-    Returns:
-        Top final_top_k hits sorted by final_score descending.
-    """
-    citation_counts = [
-        float(h["fields"].get("citation_count") or 0) for h in hits
-    ]
-    max_citations = max(citation_counts) if citation_counts else 0.0
-
-    scored: list[tuple[float, dict]] = []
-    for i, hit in enumerate(hits):
-        sem = semantic_scores[i] if i < len(semantic_scores) else 0.0
-        if max_citations > 0:
-            cite_norm = citation_counts[i] / max_citations
-            final = 0.7 * sem + 0.3 * cite_norm
-        else:
-            final = sem
-        scored.append((final, hit))
-
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return [h for _, h in scored[:final_top_k]]
-
-
 def retrieve_patents(
     query: str,
     company: str | None = None,
@@ -171,19 +131,19 @@ def retrieve_patents(
     final_top_k: int = 8,
 ) -> list[dict]:
     """
-    Search the patents namespace and return citation-boosted, reranked hits.
+    Search the patents namespace and return hybrid-ranked hits.
 
     Step 1: Vector search via Pinecone integrated inference.
-    Step 2: Semantic rerank with bge-reranker-v2-m3 (fallback: score-sorted).
-    Step 3: Citation-count boost applied to reranked scores.
+    Step 2: BM25 keyword rank over candidate text.
+    Step 3: Reciprocal Rank Fusion over dense and BM25 rankings.
 
     Args:
         query:            Natural-language question or technology description.
         company:          Exact company_title value. Defaults to "Apple Inc".
         grant_date_start: ISO date lower bound on grant_date, e.g. "2020-01-01".
         grant_date_end:   ISO date upper bound on grant_date, e.g. "2024-12-31".
-        top_k:            Candidates fetched from Pinecone before reranking.
-        final_top_k:      Final number of hits returned after citation boost.
+        top_k:            Candidates fetched from Pinecone before RRF.
+        final_top_k:      Final number of hits returned after RRF.
 
     Returns:
         List of hit dicts (up to final_top_k), ordered by final_score descending.
@@ -228,42 +188,15 @@ def retrieve_patents(
     if not hits:
         return []
 
-    # Step 2: Semantic reranking
-    rerank_method = "score-sorted (fallback)"
-    semantic_scores: list[float] = [h.get("_score", 0.0) for h in hits]
-
-    try:
-        documents = [
-            (
-                f"Patent: {h['fields'].get('patent_title', '')} | "
-                f"CPC: {h['fields'].get('cpc_codes', '')} | "
-                f"Grant: {h['fields'].get('grant_date', '')} | "
-                f"Claim {h['fields'].get('claim_number', '')}"
-            )
-            for h in hits
-        ]
-        rerank_result = pc.inference.rerank(
-            model=_RERANK_MODEL,
-            query=query,
-            documents=documents,
-            top_n=len(hits),
-            return_documents=False,
-        )
-        reranked_items = sorted(rerank_result.data, key=lambda x: x.index)
-        semantic_scores = [item.score for item in rerank_result.data]
-        hits = [hits[item.index] for item in rerank_result.data]
-        rerank_method = "bge-reranker-v2-m3 + citation-boost"
-    except Exception as exc:
-        logger.warning(
-            "Reranking failed — using score-sorted order with citation boost",
-            extra={"error": str(exc)},
-        )
-        hits = sorted(hits, key=lambda h: h.get("_score", 0.0), reverse=True)
-        semantic_scores = [h.get("_score", 0.0) for h in hits]
-        rerank_method = "score-sorted + citation-boost (fallback)"
-
-    # Step 3: Citation-count boost
-    hits = _citation_boost_rerank(hits, semantic_scores, final_top_k)
+    dense_ranked_hits = sorted(hits, key=lambda h: h.get("_score", 0.0), reverse=True)
+    hits = hybrid_rrf_rank(
+        query,
+        dense_ranked_hits,
+        text_getter=lambda h: h.get("fields", {}).get("text", ""),
+        key=lambda h: h.get("_id") or h.get("id") or "",
+        top_k=final_top_k,
+    )
+    rerank_method = "dense-vector + BM25 RRF"
 
     logger.info(
         "Patent retrieval complete",

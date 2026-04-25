@@ -5,6 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ma-oracle"
 version = "0.1.0"
+requires-python = ">=3.11"
 dependencies = [
     "beautifulsoup4>=4.14.3",
     "lxml>=6.0.4",
@@ -19,8 +20,13 @@ dependencies = [
     "pinecone>=8.1.2",
     "python-dotenv>=1.0.1",
     "google-cloud-secret-manager>=2.27.0",
+    "rank-bm25>=0.2.2",
     "scikit-learn>=1.8.0",
     "docling>=2.90.0",
+    "jsonpatch>=1.33",
+    "langgraph>=0.2.0",
+    "langchain-google-vertexai>=2.0.0",
+    "redis>=5.0.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -28,3 +34,4 @@ where = ["."]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+testpaths = ["tests"]

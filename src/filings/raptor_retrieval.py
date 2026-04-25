@@ -1,5 +1,6 @@
 """
 Query-time retrieval over RAPTOR vectors stored in Pinecone.
+This is entry-point for RAPTOR-based retreival 
 
 Calling modules:
 
@@ -33,6 +34,8 @@ from typing import List, Dict, Any, Optional, Tuple, Set
 from dotenv import load_dotenv
 
 from .config_loader import load_config_yaml
+from src.utils.secrets import get_secret
+from src.utils.hybrid import hybrid_rrf_rank
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -74,12 +77,7 @@ def get_pinecone_client():
 
     from pinecone import Pinecone
 
-    pinecone_api_key = os.getenv(PINECONE_API_KEY_ENV, "").strip()
-    if not pinecone_api_key:
-        raise ValueError(
-            f"{PINECONE_API_KEY_ENV} is missing. Set it in {BASE_DIR / '.env'} "
-            "or the current environment before retrieval."
-        )
+    pinecone_api_key = get_secret(PINECONE_API_KEY_ENV)
 
     _PINECONE_CLIENT = Pinecone(api_key=pinecone_api_key)
     return _PINECONE_CLIENT
@@ -547,17 +545,14 @@ def raptor_retrieve(
     leaf_chunk_count = sum(1 for n in combined_nodes if n.get("node_type") == "leaf")
     logger.info(f"Combined leaf chunk nodes after summary expansion + dedup: {leaf_chunk_count}")
 
-    ranked_nodes: List[Dict[str, Any]] = []
-    try:
-        ranked_nodes = rerank_nodes_pinecone(query, combined_nodes, top_n=final_top_k)
-    except Exception as exc:
-        logger.warning("Pinecone rerank failed (%s). Falling back to simple rerank.", str(exc))
-
-    if not ranked_nodes:
-        if use_simple_rerank:
-            ranked_nodes = rerank_nodes_simple(query, combined_nodes, alpha=0.8)[:final_top_k]
-        else:
-            ranked_nodes = sort_nodes_by_score(combined_nodes)[:final_top_k]
+    dense_ranked_nodes = sort_nodes_by_score(combined_nodes)
+    ranked_nodes = hybrid_rrf_rank(
+        query,
+        dense_ranked_nodes,
+        text_getter=lambda node: str(node.get("text", "")),
+        key=lambda node: str(node.get("id") or ""),
+        top_k=final_top_k,
+    )
 
     contexts = []
     for rank, node in enumerate(ranked_nodes, start=1):
