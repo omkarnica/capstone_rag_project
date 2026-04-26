@@ -303,3 +303,43 @@ def test_build_graph_no_args_sets_empty_eval_config():
     # The module-level initialize_state does NOT inject eval_config (it's the old function)
     # So we just verify build_graph() with no args doesn't raise
     assert graph is not None
+
+
+def test_runner_produces_result_file(tmp_path):
+    from unittest.mock import patch, MagicMock
+    from evals.runner import EvalRunner
+
+    mini_dataset = [
+        {
+            "id": "t1_001",
+            "tier": 1,
+            "query": "What was Apple's total revenue in FY2024?",
+            "expected_answer": "Apple FY2024 revenue was $391.0 billion.",
+            "expected_sources": ["AAPL XBRL FY2024"],
+            "expected_entities": ["Apple", "FY2024"],
+            "expected_numbers": [391.0],
+            "expected_contradictions": [],
+            "route": "sql",
+        }
+    ]
+    mini_configs = {
+        "naive_rag": {"router": False, "reranker": False, "corrective": False, "self_rag": False}
+    }
+
+    mock_graph = MagicMock()
+    mock_graph.invoke.return_value = {
+        "answer": "Apple's FY2024 revenue was $391.0 billion.",
+        "citations": ["AAPL XBRL FY2024"],
+        "retrieved_docs": [{"content": "Revenue 391B", "metadata": {"source": "AAPL XBRL FY2024"}}],
+    }
+
+    with patch("evals.runner.build_graph", return_value=mock_graph):
+        runner = EvalRunner(output_dir=str(tmp_path))
+        run_id = runner.run(configs=mini_configs, dataset=mini_dataset, skip_llm_metrics=True)
+
+    result_file = tmp_path / f"{run_id}.json"
+    assert result_file.exists()
+    import json
+    data = json.loads(result_file.read_text())
+    assert "naive_rag" in data["configs"]
+    assert "tier_1" in data["configs"]["naive_rag"]
