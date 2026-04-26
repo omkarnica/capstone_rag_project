@@ -28,3 +28,6 @@ ma_oracle.egg-info/
 ma_oracle.egg-info/
 .pytest_cache/
 .env
+
+# Eval results (large, machine-generated)
+evals/results/*.json
