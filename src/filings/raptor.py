@@ -42,7 +42,8 @@ from pinecone.grpc import PineconeGRPC as Pinecone
 from google import genai
 
 from .config_loader import load_config_yaml
-from src.model_config import get_model_name
+from src.model_config import get_genai_client, get_model_name
+from src.utils.secrets import get_secret
 
 # =========================
 # CONFIG
@@ -103,19 +104,7 @@ def _get_vertex_genai_client() -> genai.Client:
     if _VERTEX_GENAI_CLIENT is not None:
         return _VERTEX_GENAI_CLIENT
 
-    project_id = os.getenv(GEMINI_PROJECT_ID_ENV, "").strip()
-    location = os.getenv(GEMINI_LOCATION_ENV, "").strip()
-    if not project_id or not location:
-        raise ValueError(
-            f"{GEMINI_PROJECT_ID_ENV} or {GEMINI_LOCATION_ENV} is missing. "
-            f"Set them in {BASE_DIR / '.env'} for Vertex Gemini calls."
-        )
-
-    _VERTEX_GENAI_CLIENT = genai.Client(
-        vertexai=True,
-        project=project_id,
-        location=location,
-    )
+    _VERTEX_GENAI_CLIENT = get_genai_client()
     return _VERTEX_GENAI_CLIENT
 
 
@@ -222,7 +211,7 @@ def get_pinecone_client():
     global _PINECONE_CLIENT
     if _PINECONE_CLIENT is not None:
         return _PINECONE_CLIENT
-    pinecone_api_key = os.getenv(PINECONE_API_KEY_ENV, "").strip()
+    pinecone_api_key = get_secret(PINECONE_API_KEY_ENV).strip()
     if not pinecone_api_key:
         raise ValueError(
             f"{PINECONE_API_KEY_ENV} is missing. Set it in {BASE_DIR / '.env'}"
@@ -800,6 +789,7 @@ def run_raptor_pipeline(
     n_components: int = 10,
     run_self_test: bool = True,
     self_test_only: bool | None = None,
+    output_dir: str | None = None,
 ):
     """
     Final end-to-end RAPTOR pipeline wrapper.
@@ -821,6 +811,7 @@ def run_raptor_pipeline(
     chunks = load_chunks_from_json(str(chunks_path))
     source_doc_id = derive_source_doc_id(chunks, default_value=chunks_path.stem)
     tree_output_filename = derive_tree_output_filename(chunks, default_stem=source_doc_id)
+    tree_output_path = str((Path(output_dir) / tree_output_filename) if output_dir else tree_output_filename)
 
     if run_self_test:
         run_main_self_test(chunks=chunks, embedder=embedder, source_doc_id=source_doc_id)
@@ -836,5 +827,5 @@ def run_raptor_pipeline(
         namespace=namespace_value,
         max_levels=max_levels,
         n_components=n_components,
-        tree_output_path=tree_output_filename,
+        tree_output_path=tree_output_path,
     )

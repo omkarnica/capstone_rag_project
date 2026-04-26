@@ -69,6 +69,11 @@ def _load_docling_entries(docling_json_path: str) -> List[Dict[str, Any]]:
     raise ValueError("Unsupported Docling JSON format. Expected dict or list of dicts.")
 
 
+def _artifact_path_from_folder(folder: str, suffix: str) -> str:
+    folder_path = Path(folder)
+    return (folder_path.parent / f"{folder_path.name}{suffix}").as_posix()
+
+
 def run_filings_pipeline(
     company_title: str,
     form_type: str = "10-K",
@@ -109,7 +114,7 @@ def run_filings_pipeline(
     ]
     final_chunks = [ch for ch in filtered_chunks if should_keep_chunk(ch)]
 
-    chunks_output_path = str(Path(folder).with_name(f"{folder}_pinecone_ready_chunks.json"))
+    chunks_output_path = _artifact_path_from_folder(folder, "_pinecone_ready_chunks.json")
     save_chunks_to_json(final_chunks, chunks_output_path)
     logger.info("Chunking completed: total=%s final=%s", len(chunks), len(final_chunks))
 
@@ -121,13 +126,14 @@ def run_filings_pipeline(
         max_levels=max_levels,
         n_components=n_components,
         run_self_test=True,
+        output_dir=str(Path(folder).parent),
     )
 
     # Determine tree path saved by RAPTOR so we can verify it.
     loaded_chunks = load_chunks_from_json(chunks_output_path)
     source_doc_id = derive_source_doc_id(loaded_chunks, default_value=Path(chunks_output_path).stem)
     tree_output_filename = derive_tree_output_filename(loaded_chunks, default_stem=source_doc_id)
-    tree_output_path = str((Path.cwd() / tree_output_filename).resolve())
+    tree_output_path = str((Path(folder).parent / tree_output_filename).as_posix())
 
     # 4) Verification
     verification_output = verify_raptor_tree(tree_output_path, index=None, namespace=(namespace or "user1"))
