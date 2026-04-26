@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import logging
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -69,7 +68,7 @@ class EvalRunner:
                 scores = self._evaluate_item(graph, item, skip_llm_metrics)
                 tier_scores[tier_key].append(scores)
             except Exception as exc:
-                logger.warning("Item %s failed in config %s: %s", item["id"], config_name, exc)
+                logger.warning("Item %s failed in config %s: %s", item.get("id", "<unknown>"), config_name, exc)
                 tier_scores[tier_key].append({})
 
         return {
@@ -210,7 +209,7 @@ class EvalRunner:
 
     def _write(self, run_id: str, result: dict) -> None:
         path = self.output_dir / f"{run_id}.json"
-        path.write_text(json.dumps(result, indent=2))
+        path.write_text(json.dumps(result, indent=2), encoding="utf-8")
 
 
 def _average_scores(score_list: list[dict]) -> dict[str, float]:
