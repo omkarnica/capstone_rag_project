@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 
 from deepeval.metrics import BaseMetric
@@ -136,3 +137,161 @@ def _extract_numbers(text: str) -> list[float]:
         except ValueError:
             pass
     return results
+
+
+class CompletenessMetric(BaseMetric):
+    """LLM judge: does the answer cover all required points from expected_output?"""
+
+    def __init__(self, model=None, threshold: float = 0.7):
+        self.model = model
+        self.threshold = threshold
+        self.score = 0.0
+        self.success = False
+        self.async_mode = False
+
+    @property
+    def __name__(self) -> str:
+        return "Completeness"
+
+    def _get_model(self):
+        if self.model is not None:
+            return self.model
+        from evals.metrics.gemini_judge import GeminiJudge
+        return GeminiJudge()
+
+    def compute(self, actual_output: str, expected_output: str) -> float:
+        prompt = (
+            "You are evaluating whether an AI answer is complete relative to a reference answer.\n\n"
+            f"Reference answer:\n{expected_output}\n\n"
+            f"AI answer:\n{actual_output}\n\n"
+            "Return JSON with keys 'score' (float 0-1) and 'reason' (string).\n"
+            "Score 1.0 = covers all key points. Score 0.0 = misses most key points."
+        )
+        raw = self._get_model().generate(prompt)
+        try:
+            data = json.loads(raw.strip().strip("```json").strip("```"))
+            return float(data.get("score", 0.0))
+        except (json.JSONDecodeError, ValueError):
+            return 0.0
+
+    def measure(self, test_case: LLMTestCase) -> float:
+        self.score = self.compute(
+            actual_output=test_case.actual_output or "",
+            expected_output=test_case.expected_output or "",
+        )
+        self.success = self.score >= self.threshold
+        return self.score
+
+    async def a_measure(self, test_case: LLMTestCase) -> float:
+        return self.measure(test_case)
+
+    def is_successful(self) -> bool:
+        return self.success
+
+
+class ContradictionDetectionRate(BaseMetric):
+    """Tier-4 only: did the system surface the expected contradictions?"""
+
+    def __init__(self, model=None, threshold: float = 0.6):
+        self.model = model
+        self.threshold = threshold
+        self.score = 0.0
+        self.success = False
+        self.async_mode = False
+
+    @property
+    def __name__(self) -> str:
+        return "ContradictionDetectionRate"
+
+    def _get_model(self):
+        if self.model is not None:
+            return self.model
+        from evals.metrics.gemini_judge import GeminiJudge
+        return GeminiJudge()
+
+    def compute(self, actual_output: str, expected_contradictions: list[str]) -> float:
+        if not expected_contradictions:
+            return 1.0
+        prompt = (
+            "You are evaluating whether an AI response identified specific contradictions "
+            "in M&A due diligence analysis.\n\n"
+            "Expected contradictions to find:\n" +
+            "\n".join(f"- {c}" for c in expected_contradictions) +
+            f"\n\nAI response:\n{actual_output}\n\n"
+            "Return JSON with 'score' (float 0-1) and 'reason' (string).\n"
+            "Score = fraction of expected contradictions surfaced in the response."
+        )
+        raw = self._get_model().generate(prompt)
+        try:
+            data = json.loads(raw.strip().strip("```json").strip("```"))
+            return float(data.get("score", 0.0))
+        except (json.JSONDecodeError, ValueError):
+            return 0.0
+
+    def measure(self, test_case: LLMTestCase) -> float:
+        expected_contradictions = getattr(test_case, "expected_contradictions", [])
+        self.score = self.compute(
+            actual_output=test_case.actual_output or "",
+            expected_contradictions=expected_contradictions,
+        )
+        self.success = self.score >= self.threshold
+        return self.score
+
+    async def a_measure(self, test_case: LLMTestCase) -> float:
+        return self.measure(test_case)
+
+    def is_successful(self) -> bool:
+        return self.success
+
+
+class DueDiligenceConfidenceScore(BaseMetric):
+    """Composite weighted score: faithfulness × completeness × numerical accuracy × citation."""
+
+    WEIGHTS = {
+        "faithfulness": 0.35,
+        "completeness": 0.30,
+        "numerical_accuracy": 0.25,
+        "citation_accuracy": 0.10,
+    }
+
+    def __init__(self, threshold: float = 0.7):
+        self.threshold = threshold
+        self.score = 0.0
+        self.success = False
+        self.async_mode = False
+
+    @property
+    def __name__(self) -> str:
+        return "DueDiligenceConfidence"
+
+    @staticmethod
+    def weighted_score(
+        faithfulness: float,
+        completeness: float,
+        numerical_accuracy: float,
+        citation_accuracy: float,
+    ) -> float:
+        w = DueDiligenceConfidenceScore.WEIGHTS
+        return (
+            faithfulness * w["faithfulness"]
+            + completeness * w["completeness"]
+            + numerical_accuracy * w["numerical_accuracy"]
+            + citation_accuracy * w["citation_accuracy"]
+        )
+
+    def measure(self, test_case: LLMTestCase) -> float:
+        scores = getattr(test_case, "component_scores", {})
+        self.score = self.weighted_score(
+            faithfulness=scores.get("faithfulness", 0.0),
+            completeness=scores.get("completeness", 0.0),
+            numerical_accuracy=scores.get("numerical_accuracy", 0.0),
+            citation_accuracy=scores.get("citation_accuracy", 0.0),
+        )
+        self.success = self.score >= self.threshold
+        return self.score
+
+    async def a_measure(self, test_case: LLMTestCase) -> float:
+        return self.measure(test_case)
+
+    def is_successful(self) -> bool:
+        return self.success

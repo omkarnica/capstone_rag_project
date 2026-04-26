@@ -174,3 +174,40 @@ def test_extract_numbers_ignores_years():
     result = _extract_numbers("Apple FY2024 revenue was $391.0 billion.")
     assert 2024.0 not in result
     assert 391.0 in result
+
+
+def test_completeness_metric_mocked():
+    from unittest.mock import MagicMock
+    from evals.metrics.due_diligence import CompletenessMetric
+
+    mock_judge = MagicMock()
+    mock_judge.generate.return_value = '{"score": 0.9, "reason": "covers all key points"}'
+
+    m = CompletenessMetric(model=mock_judge)
+    score = m.compute(
+        actual_output="Apple FY2024 revenue was $391.0B driven by iPhone sales.",
+        expected_output="Apple's total revenue for FY2024 was $391.0 billion.",
+    )
+    assert score == 0.9
+
+
+def test_due_diligence_confidence_weighted():
+    from evals.metrics.due_diligence import DueDiligenceConfidenceScore
+    score = DueDiligenceConfidenceScore.weighted_score(
+        faithfulness=1.0,
+        completeness=1.0,
+        numerical_accuracy=1.0,
+        citation_accuracy=1.0,
+    )
+    assert abs(score - 1.0) < 0.001
+
+
+def test_due_diligence_confidence_partial():
+    from evals.metrics.due_diligence import DueDiligenceConfidenceScore
+    score = DueDiligenceConfidenceScore.weighted_score(
+        faithfulness=0.0,
+        completeness=0.0,
+        numerical_accuracy=0.0,
+        citation_accuracy=0.0,
+    )
+    assert score == 0.0
