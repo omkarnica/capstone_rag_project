@@ -96,3 +96,74 @@ def test_ndcg_single_relevant_doc():
         expected_sources=["AAPL 10-K 2024"],
     )
     assert score == 1.0
+
+
+def test_numerical_accuracy_exact():
+    from evals.metrics.due_diligence import NumericalAccuracyMetric
+    m = NumericalAccuracyMetric()
+    score = m.compute(
+        answer="Apple's FY2024 revenue was $391.0 billion.",
+        expected_numbers=[391.0],
+    )
+    assert score == 1.0
+
+
+def test_numerical_accuracy_within_tolerance():
+    from evals.metrics.due_diligence import NumericalAccuracyMetric
+    m = NumericalAccuracyMetric()
+    # 392.0 is within 1% of 391.0 (diff = 0.256%)
+    score = m.compute(
+        answer="Revenue was approximately $392.0 billion.",
+        expected_numbers=[391.0],
+    )
+    assert score == 1.0
+
+
+def test_numerical_accuracy_wrong():
+    from evals.metrics.due_diligence import NumericalAccuracyMetric
+    m = NumericalAccuracyMetric()
+    score = m.compute(
+        answer="Revenue was $300 billion.",
+        expected_numbers=[391.0],
+    )
+    assert score == 0.0
+
+
+def test_entity_match_all_present():
+    from evals.metrics.due_diligence import EntityMatchPrecisionMetric
+    m = EntityMatchPrecisionMetric()
+    score = m.compute(
+        answer="Apple reported FY2024 revenue of $391.0 billion.",
+        expected_entities=["Apple", "FY2024", "$391.0 billion"],
+    )
+    assert score == 1.0
+
+
+def test_entity_match_partial():
+    from evals.metrics.due_diligence import EntityMatchPrecisionMetric
+    m = EntityMatchPrecisionMetric()
+    score = m.compute(
+        answer="Apple reported revenue.",
+        expected_entities=["Apple", "FY2024", "$391.0 billion"],
+    )
+    assert abs(score - 1/3) < 0.01
+
+
+def test_citation_accuracy_full_overlap():
+    from evals.metrics.due_diligence import CitationAccuracyMetric
+    m = CitationAccuracyMetric()
+    score = m.compute(
+        cited_sources=["AAPL 10-K 2024", "AAPL XBRL FY2024"],
+        expected_sources=["AAPL 10-K 2024", "AAPL XBRL FY2024"],
+    )
+    assert score == 1.0
+
+
+def test_citation_accuracy_no_overlap():
+    from evals.metrics.due_diligence import CitationAccuracyMetric
+    m = CitationAccuracyMetric()
+    score = m.compute(
+        cited_sources=["MSFT 10-K 2024"],
+        expected_sources=["AAPL 10-K 2024"],
+    )
+    assert score == 0.0
