@@ -88,9 +88,9 @@ def trigger_eval(background_tasks: BackgroundTasks) -> dict[str, str]:
     dataset = json.loads(dataset_path.read_text(encoding="utf-8"))
     run_id = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%S")
 
-    def _run():
+    def _run(rid: str):
         runner = EvalRunner()
-        runner.run(configs=ABLATION_CONFIGS, dataset=dataset)
+        runner.run(configs=ABLATION_CONFIGS, dataset=dataset, run_id=rid)
 
-    background_tasks.add_task(_run)
+    background_tasks.add_task(_run, run_id)
     return {"run_id": run_id, "status": "started"}

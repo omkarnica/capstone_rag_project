@@ -24,8 +24,10 @@ class EvalRunner:
         configs: dict[str, dict],
         dataset: list[dict],
         skip_llm_metrics: bool = False,
+        run_id: str | None = None,
     ) -> str:
-        run_id = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%S")
+        if run_id is None:
+            run_id = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%S")
         result: dict[str, Any] = {
             "run_id": run_id,
             "completed_at": None,
