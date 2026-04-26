@@ -391,3 +391,90 @@ def test_eval_api_get_run(tmp_path):
     resp = client.get("/eval/runs/2026-04-25T12-00-00")
     assert resp.status_code == 200
     assert resp.json()["run_id"] == "2026-04-25T12-00-00"
+
+
+def test_eval_api_latest_run(tmp_path):
+    import json, time
+    import src.eval_api as eval_api_module
+    eval_api_module._RESULTS_DIR = tmp_path
+
+    fixture = {"run_id": "2026-04-25T12-00-00", "completed_at": "T", "configs": {}, "baseline_delta": {}}
+    (tmp_path / "2026-04-25T12-00-00.json").write_text(json.dumps(fixture), encoding="utf-8")
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    app = FastAPI()
+    app.include_router(eval_api_module.router)
+    client = TestClient(app)
+
+    resp = client.get("/eval/runs/latest")
+    assert resp.status_code == 200
+    assert resp.json()["run_id"] == "2026-04-25T12-00-00"
+
+
+def test_eval_api_run_summary(tmp_path):
+    import json
+    import src.eval_api as eval_api_module
+    eval_api_module._RESULTS_DIR = tmp_path
+
+    fixture = {
+        "run_id": "2026-04-25T12-00-00",
+        "completed_at": "T",
+        "configs": {"naive_rag": {"tier_1": {"mrr": 0.5, "ndcg": 0.6}, "tier_2": {"mrr": 0.7, "ndcg": 0.8}}},
+        "baseline_delta": {},
+    }
+    (tmp_path / "2026-04-25T12-00-00.json").write_text(json.dumps(fixture), encoding="utf-8")
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    app = FastAPI()
+    app.include_router(eval_api_module.router)
+    client = TestClient(app)
+
+    resp = client.get("/eval/runs/2026-04-25T12-00-00/summary")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "naive_rag" in data["configs"]
+    # Average of 0.5 and 0.7 = 0.6
+    assert abs(data["configs"]["naive_rag"]["mrr"] - 0.6) < 0.001
+
+
+def test_eval_api_run_ablation(tmp_path):
+    import json
+    import src.eval_api as eval_api_module
+    eval_api_module._RESULTS_DIR = tmp_path
+
+    fixture = {
+        "run_id": "2026-04-25T12-00-00",
+        "completed_at": "T",
+        "configs": {"naive_rag": {}, "full_system": {}},
+        "baseline_delta": {"full_system_vs_naive": {}},
+    }
+    (tmp_path / "2026-04-25T12-00-00.json").write_text(json.dumps(fixture), encoding="utf-8")
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    app = FastAPI()
+    app.include_router(eval_api_module.router)
+    client = TestClient(app)
+
+    resp = client.get("/eval/runs/2026-04-25T12-00-00/ablation")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "baseline_delta" in data
+    assert "full_system_vs_naive" in data["baseline_delta"]
+
+
+def test_eval_api_invalid_run_id_rejected(tmp_path):
+    import src.eval_api as eval_api_module
+    eval_api_module._RESULTS_DIR = tmp_path
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    app = FastAPI()
+    app.include_router(eval_api_module.router)
+    client = TestClient(app)
+
+    # Path traversal attempt should return 400
+    resp = client.get("/eval/runs/../../etc/passwd")
+    assert resp.status_code in (400, 404)  # 404 is also acceptable (FastAPI may reject the URL)

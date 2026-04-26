@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
+
+_RUN_ID_RE = re.compile(r"^[\w.\-T:]+$")
 
 _RESULTS_DIR = Path(__file__).parent.parent / "evals" / "results"
 
@@ -16,7 +19,12 @@ def _results_dir() -> Path:
 
 
 def _load_run(run_id: str) -> dict[str, Any]:
-    path = _results_dir() / f"{run_id}.json"
+    if not _RUN_ID_RE.match(run_id):
+        raise HTTPException(status_code=400, detail="Invalid run_id format")
+    results = _results_dir()
+    path = (results / f"{run_id}.json").resolve()
+    if not str(path).startswith(str(results.resolve())):
+        raise HTTPException(status_code=400, detail="Invalid run_id format")
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
     return json.loads(path.read_text(encoding="utf-8"))
