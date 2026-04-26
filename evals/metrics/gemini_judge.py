@@ -13,8 +13,7 @@ class GeminiJudge(DeepEvalBaseLLM):
         return get_genai_client()
 
     def generate(self, prompt: str) -> str:
-        client = get_genai_client()
-        response = client.models.generate_content(
+        response = self.model.models.generate_content(
             model=get_model_name(),
             contents=prompt,
         )
