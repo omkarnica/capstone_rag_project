@@ -29,6 +29,8 @@ dependencies = [
     "langchain-google-vertexai>=2.0.0",
     "redis>=5.0.0",
     "deepeval>=1.0.0",
+    "fastapi>=0.110.0",
+    "httpx>=0.27.0",
 ]
 
 [tool.setuptools.packages.find]

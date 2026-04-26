@@ -11,6 +11,7 @@ import time
 
 from src.api import run_adaptive_query, run_single_question
 from src.audit.logger import build_audit_record, log_query
+from src.eval_api import router as eval_router
 from src.utils.secrets import preload_secrets
 
 
@@ -60,6 +61,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(eval_router)
 
 
 @app.get("/health", response_model=HealthResponse)

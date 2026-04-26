@@ -343,3 +343,51 @@ def test_runner_produces_result_file(tmp_path):
     data = json.loads(result_file.read_text())
     assert "naive_rag" in data["configs"]
     assert "tier_1" in data["configs"]["naive_rag"]
+
+
+def test_eval_api_list_runs(tmp_path):
+    import json
+    import src.eval_api as eval_api_module
+    eval_api_module._RESULTS_DIR = tmp_path  # override for test
+
+    fixture = {
+        "run_id": "2026-04-25T12-00-00",
+        "completed_at": "2026-04-25T12:06:00",
+        "configs": {"naive_rag": {"tier_1": {"mrr": 0.5}}},
+        "baseline_delta": {},
+    }
+    (tmp_path / "2026-04-25T12-00-00.json").write_text(json.dumps(fixture))
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    app = FastAPI()
+    app.include_router(eval_api_module.router)
+    client = TestClient(app)
+
+    resp = client.get("/eval/runs")
+    assert resp.status_code == 200
+    assert "2026-04-25T12-00-00" in resp.json()["run_ids"]
+
+
+def test_eval_api_get_run(tmp_path):
+    import json
+    import src.eval_api as eval_api_module
+    eval_api_module._RESULTS_DIR = tmp_path
+
+    fixture = {
+        "run_id": "2026-04-25T12-00-00",
+        "completed_at": "2026-04-25T12:06:00",
+        "configs": {"full_system": {"tier_1": {"mrr": 0.8}}},
+        "baseline_delta": {},
+    }
+    (tmp_path / "2026-04-25T12-00-00.json").write_text(json.dumps(fixture), encoding="utf-8")
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    app = FastAPI()
+    app.include_router(eval_api_module.router)
+    client = TestClient(app)
+
+    resp = client.get("/eval/runs/2026-04-25T12-00-00")
+    assert resp.status_code == 200
+    assert resp.json()["run_id"] == "2026-04-25T12-00-00"
