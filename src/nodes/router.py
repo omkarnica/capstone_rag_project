@@ -61,6 +61,16 @@ Return structured output with route and reason.
 
 
 def route_question(state: GraphState) -> GraphState:
+    eval_config = state.get("eval_config") or {}
+    if eval_config.get("router") is False:
+        # Naive RAG: bypass LLM router, default to filings (vector search)
+        return {
+            **state,
+            "route": "filings",
+            "initial_route": "filings",
+            "route_reason": "eval: router disabled (naive RAG baseline)",
+        }
+
     question = state["question"]
     route_hint = state.get("route_hint", "none") or "none"
     force_route = state.get("force_route", False)

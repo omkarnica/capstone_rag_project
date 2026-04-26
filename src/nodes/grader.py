@@ -40,6 +40,17 @@ def grade_documents(state: GraphState) -> GraphState:
     Grade each retrieved chunk for relevance to the question.
     Keep only relevant chunks.
     """
+    eval_config = state.get("eval_config") or {}
+    if eval_config.get("corrective") is False:
+        # Ablation: skip corrective grading, pass all docs through
+        docs = state.get("retrieved_docs", [])
+        return {
+            **state,
+            "filtered_docs": docs,
+            "doc_relevance": ["yes"] * len(docs),
+            "relevant_doc_count": len(docs),
+        }
+
     question = state.get("rewritten_question") or state["question"]
     retrieved_docs = state.get("retrieved_docs", [])
 
@@ -94,6 +105,10 @@ def grade_hallucination(state: GraphState) -> GraphState:
     Self-RAG:
     Check whether the generated answer is supported by available context.
     """
+    eval_config = state.get("eval_config") or {}
+    if eval_config.get("self_rag") is False:
+        return {**state, "hallucination_grade": "yes"}
+
     answer = state.get("answer", "")
     context = _format_context_for_grading(state)
 
@@ -134,6 +149,10 @@ def grade_answer_quality(state: GraphState) -> GraphState:
     Self-RAG:
     Check whether the answer actually addresses the user's question.
     """
+    eval_config = state.get("eval_config") or {}
+    if eval_config.get("self_rag") is False:
+        return {**state, "answer_quality_grade": "yes"}
+
     question = state["question"]
     answer = state.get("answer", "")
 

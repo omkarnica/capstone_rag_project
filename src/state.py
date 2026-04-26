@@ -1,4 +1,4 @@
-from typing import List, Literal, TypedDict
+from typing import Any, Dict, List, Literal, TypedDict
 
 
 class GraphState(TypedDict, total=False):
@@ -48,3 +48,6 @@ class GraphState(TypedDict, total=False):
 
     retrieval_attempt: int
     max_retrieval_attempts: int
+
+    # Evaluation ablation config — None in production, dict during eval runs
+    eval_config: Dict[str, Any]
