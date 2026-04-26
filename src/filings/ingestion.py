@@ -46,6 +46,8 @@ from .config_loader import load_config_yaml
 
 
 BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR.parent.parent
+DATA_DIR = PROJECT_ROOT / "data"
 load_dotenv(dotenv_path=BASE_DIR / ".env")
 _CONFIG = load_config_yaml(BASE_DIR / "config.yaml")
 
@@ -167,13 +169,17 @@ def get_filings(cik):
     filings = data['filings']['recent']
     results = []
     for i, form in enumerate(filings['form']):
+        filing_date = filings.get('filingDate', [None] * len(filings['form']))[i]
+        report_date = filings.get('reportDate', [None] * len(filings['form']))[i]
+        year_source = report_date or filing_date
         # Accept any form type (e.g., 10-K, 10-Q) in the pipeline
         results.append({
             "form": form,
-            "year": int(filings['filingDate'][i][:4]) if 'filingDate' in filings and filings['filingDate'][i] else None,
+            "year": int(year_source[:4]) if year_source else None,
+            "filing_date": filing_date,
             "accession": filings['accessionNumber'][i].replace('-', ''),
             "primary_doc": filings['primaryDocument'][i],
-            "report_date": filings.get('reportDate', [None]*len(filings['form']))[i],
+            "report_date": report_date,
             "filing_url": f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{filings['accessionNumber'][i].replace('-', '')}/{filings['primaryDocument'][i]}"
         })
     return results
@@ -231,7 +237,7 @@ def ingestion_pipeline(company_title, form_type="10-K", ticker_override=None):
         logger.error("No %s filings from 2021 to 2025 found for %s.", form_type, company_title)
         return None
 
-    folder = f"{ticker.lower()}_{form_type.lower()}"
+    folder = str(DATA_DIR / f"{ticker.lower()}_{form_type.lower()}")
     os.makedirs(folder, exist_ok=True)
 
     for filing in filtered_filings:
@@ -253,7 +259,516 @@ def ingestion_pipeline(company_title, form_type="10-K", ticker_override=None):
             time.sleep(1.5)
         except Exception as e:
             logger.exception("Error downloading %s: %s", url, e)
-    return folder, ticker
+    return folder, ticker, cik, filtered_filings
+
+
+def _find_exhibit_21_filename(index_json):
+    logger.info("Entering _find_exhibit_21_filename")
+    items = index_json.get("directory", {}).get("item", [])
+    for item in items:
+        item_type = str(item.get("type", "")).upper()
+        item_name = str(item.get("name", "")).lower()
+        if item_type.startswith("EX-21") or "exhibit21" in item_name or "ex21" in item_name:
+            return item.get("name")
+    return None
+
+
+def _lookup_exhibit_21_filename(cik, accession_nodash):
+    logger.info("Entering _lookup_exhibit_21_filename")
+    index_url = (
+        f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
+        f"{accession_nodash}/index.json"
+    )
+    try:
+        response = requests.get(index_url, headers=HEADERS)
+        if response.status_code != 200:
+            logger.info("No filing index JSON found for %s: status=%s", index_url, response.status_code)
+            return None
+        return _find_exhibit_21_filename(response.json())
+    except Exception as e:
+        logger.exception("Error fetching filing index %s: %s", index_url, e)
+        return None
+
+
+def _build_exhibit_21_url(cik, accession_nodash, exhibit_filename):
+    logger.info("Entering _build_exhibit_21_url")
+    return (
+        f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
+        f"{accession_nodash}/{exhibit_filename}"
+    )
+
+
+def _fetch_exhibit_21_html(cik, accession_nodash, exhibit_filename):
+    logger.info("Entering _fetch_exhibit_21_html")
+    exhibit_url = _build_exhibit_21_url(cik, accession_nodash, exhibit_filename)
+    try:
+        response = requests.get(exhibit_url, headers=HEADERS)
+        if response.status_code != 200:
+            logger.info("Failed to fetch Exhibit 21 %s: status=%s", exhibit_url, response.status_code)
+            return None
+        return response.text
+    except Exception as e:
+        logger.exception("Error downloading Exhibit 21 %s: %s", exhibit_url, e)
+        return None
+
+
+def _normalize_subsidiary_name(text):
+    logger.info("Entering _normalize_subsidiary_name")
+    return re.sub(r"\s+", " ", str(text or "")).strip(" -:\t\r\n")
+
+
+def _looks_like_header_row(text):
+    logger.info("Entering _looks_like_header_row")
+    lowered = text.lower()
+    return any(
+        phrase in lowered
+        for phrase in (
+            "name of subsidiary",
+            "subsidiaries",
+            "jurisdiction",
+            "state of incorporation",
+            "exhibit 21",
+            "list of subsidiaries",
+        )
+    )
+
+
+def _extract_subsidiaries_from_exhibit_html(html_text):
+    logger.info("Entering _extract_subsidiaries_from_exhibit_html")
+    if not html_text:
+        return []
+
+    soup = BeautifulSoup(html_text, "lxml")
+    subsidiaries = []
+    seen = set()
+
+    def _add_candidate(candidate):
+        name = _normalize_subsidiary_name(candidate)
+        if not name:
+            return
+        if _looks_like_header_row(name):
+            return
+        if len(name) < 3 or len(name) > 160:
+            return
+        if not re.search(r"[A-Za-z]", name):
+            return
+        if name.lower() in seen:
+            return
+        seen.add(name.lower())
+        subsidiaries.append(name)
+
+    for table in soup.find_all("table"):
+        for row in table.find_all("tr"):
+            cells = row.find_all(["td", "th"])
+            if not cells:
+                continue
+            first_cell = _normalize_subsidiary_name(cells[0].get_text(" ", strip=True))
+            if row.find("td"):
+                _add_candidate(first_cell)
+
+    if subsidiaries:
+        return subsidiaries
+
+    for item in soup.find_all(["li", "p"]):
+        text = _normalize_subsidiary_name(item.get_text(" ", strip=True))
+        _add_candidate(text)
+
+    return subsidiaries
+
+
+def collect_subsidiaries_by_year(
+    cik,
+    ticker,
+    company_title,
+    form_type,
+    filings,
+    data_dir=DATA_DIR,
+):
+    logger.info("Entering collect_subsidiaries_by_year")
+    data_dir = Path(data_dir)
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    subsidiaries_by_year = []
+    for filing in filings:
+        accession = filing.get("accession")
+        year = filing.get("year")
+        if not accession or not year:
+            continue
+
+        exhibit_filename = _lookup_exhibit_21_filename(cik, accession)
+        if not exhibit_filename:
+            logger.info("No Exhibit 21 found for ticker=%s year=%s accession=%s", ticker, year, accession)
+            continue
+
+        exhibit_url = _build_exhibit_21_url(cik, accession, exhibit_filename)
+        exhibit_html = _fetch_exhibit_21_html(cik, accession, exhibit_filename)
+        if not exhibit_html:
+            continue
+
+        subsidiaries = _extract_subsidiaries_from_exhibit_html(exhibit_html)
+        subsidiaries_by_year.append(
+            {
+                "year": int(year) if str(year).isdigit() else year,
+                "accession": accession,
+                "exhibit_21_url": exhibit_url,
+                "subsidiaries": subsidiaries,
+            }
+        )
+
+    output_path = data_dir / f"{ticker.lower()}_{form_type.lower()}_subsidiaries.json"
+    payload = {
+        "ticker": ticker,
+        "company_title": company_title,
+        "form_type": form_type,
+        "subsidiaries_by_year": subsidiaries_by_year,
+    }
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    record_document_lifecycle(
+        file_path=output_path,
+        stage="subsidiaries_json_saved",
+        ticker=ticker,
+        form_type=form_type,
+    )
+    return output_path
+
+
+def _filter_def14a_filings(filings):
+    logger.info("Entering _filter_def14a_filings")
+    return [
+        filing for filing in filings
+        if filing.get("form") == "DEF 14A"
+        and filing.get("year") is not None
+        and 2021 <= filing["year"] <= 2025
+    ]
+
+
+def _fetch_proxy_filing_html(filing_url):
+    logger.info("Entering _fetch_proxy_filing_html")
+    try:
+        response = requests.get(filing_url, headers=HEADERS)
+        if response.status_code != 200:
+            logger.info("Failed to fetch proxy filing %s: status=%s", filing_url, response.status_code)
+            return None
+        return response.text
+    except Exception as e:
+        logger.exception("Error downloading proxy filing %s: %s", filing_url, e)
+        return None
+
+
+def _normalize_board_member_text(text):
+    logger.info("Entering _normalize_board_member_text")
+    return re.sub(r"\s+", " ", str(text or "")).strip(" -:\t\r\n")
+
+
+def _extract_table_headers(table):
+    logger.info("Entering _extract_table_headers")
+    header_cells = table.find_all("th")
+    if header_cells:
+        return [
+            _normalize_board_member_text(cell.get_text(" ", strip=True)).lower()
+            for cell in header_cells
+        ]
+
+    first_row = table.find("tr")
+    if not first_row:
+        return []
+    return [
+        _normalize_board_member_text(cell.get_text(" ", strip=True)).lower()
+        for cell in first_row.find_all("td")
+    ]
+
+
+def _get_table_context_text(table):
+    logger.info("Entering _get_table_context_text")
+    context_parts = []
+    if table.find("caption"):
+        context_parts.append(table.find("caption").get_text(" ", strip=True))
+
+    sibling = table.find_previous(["h1", "h2", "h3", "h4", "strong", "b", "p"])
+    if sibling:
+        context_parts.append(sibling.get_text(" ", strip=True))
+
+    return " ".join(context_parts).lower()
+
+
+def _looks_like_director_table(headers, context_text):
+    logger.info("Entering _looks_like_director_table")
+    header_text = " ".join(headers)
+    combined_text = f"{header_text} {context_text}"
+
+    has_name_column = any(
+        keyword in header_text
+        for keyword in ("name", "director", "nominee")
+    )
+    has_role_column = any(
+        keyword in header_text
+        for keyword in (
+            "occupation",
+            "position",
+            "title",
+            "principal",
+            "experience",
+            "business",
+        )
+    )
+    director_context = any(
+        keyword in combined_text
+        for keyword in ("board of directors", "nominees for election", "director nominees", "election of directors")
+    )
+    fee_or_numeric_table = any(
+        keyword in combined_text
+        for keyword in (
+            "fees earned",
+            "shares of common stock",
+            "beneficially owned",
+            "cash",
+            "award type",
+            "grant date",
+            "value realized",
+            "percentile",
+            "vote required",
+            "executive officers",
+            "executive compensation",
+            "security ownership",
+            "equity compensation",
+            "management proposals",
+        )
+    )
+    looks_like_year_matrix = "year" in header_text and not director_context
+    return has_name_column and (has_role_column or director_context) and not fee_or_numeric_table and not looks_like_year_matrix
+
+
+def _find_column_index(headers, keywords, default=0):
+    logger.info("Entering _find_column_index")
+    for index, header in enumerate(headers):
+        if any(keyword in header for keyword in keywords):
+            return index
+    return default
+
+
+def _is_person_like_name(name):
+    logger.info("Entering _is_person_like_name")
+    clean_name = _normalize_board_member_text(name)
+    if not clean_name:
+        return False
+    if any(char.isdigit() for char in clean_name):
+        return False
+    if "http" in clean_name.lower():
+        return False
+    disallowed_phrases = (
+        "proxy statement",
+        "report",
+        "committee",
+        "proposal",
+        "meeting",
+        "shareholder",
+        "percentile",
+        "fees",
+        "general information",
+        "business highlights",
+        "security ownership",
+        "equity compensation",
+        "annual board",
+    )
+    if any(phrase in clean_name.lower() for phrase in disallowed_phrases):
+        return False
+
+    tokens = re.findall(r"[A-Za-z&+'().-]+", clean_name)
+    alpha_tokens = [token for token in tokens if re.search(r"[A-Za-z]", token)]
+    if len(alpha_tokens) < 2 or len(alpha_tokens) > 6:
+        return False
+
+    capitalized_tokens = [
+        token for token in alpha_tokens
+        if token[0].isupper() or token.lower() in {"de", "la", "van", "von"}
+    ]
+    return len(capitalized_tokens) >= 2
+
+
+def _is_board_role_like(title):
+    logger.info("Entering _is_board_role_like")
+    clean_title = _normalize_board_member_text(title)
+    if not clean_title:
+        return False
+    if re.fullmatch(r"[\d,.%$() -]+", clean_title):
+        return False
+    if "http" in clean_title.lower():
+        return False
+    if len(clean_title) > 200:
+        return False
+
+    disallowed_phrases = (
+        "fees earned",
+        "shares of common stock",
+        "beneficially owned",
+        "page ",
+        "proposal no.",
+        "vote required",
+        "percentile",
+        "grant date",
+        "award type",
+        "value realized",
+    )
+    if any(phrase in clean_title.lower() for phrase in disallowed_phrases):
+        return False
+
+    return bool(re.search(r"[A-Za-z]", clean_title))
+
+
+def _parse_board_members_from_text(soup):
+    logger.info("Entering _parse_board_members_from_text")
+    members = []
+    seen = set()
+    bio_keywords = ("director since", "former", "chief executive officer", "chair", "president", "ceo")
+
+    for tag in soup.find_all(["p", "div"]):
+        text = _normalize_board_member_text(tag.get_text(" ", strip=True))
+        if len(text) < 20 or not any(keyword in text.lower() for keyword in bio_keywords):
+            continue
+
+        strong = tag.find(["b", "strong"])
+        if not strong:
+            continue
+
+        name = _normalize_board_member_text(strong.get_text(" ", strip=True))
+        remainder = text.replace(name, "", 1).strip(" ,:-")
+        if not _is_person_like_name(name) or not _is_board_role_like(remainder):
+            continue
+
+        key = (name.lower(), remainder.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        members.append({"name": name, "title": remainder})
+
+    return members
+
+
+def _extract_board_members_from_def14a_html(html_text):
+    logger.info("Entering _extract_board_members_from_def14a_html")
+    if not html_text:
+        return []
+
+    soup = BeautifulSoup(html_text, "lxml")
+    members = []
+    seen = set()
+
+    def _add_member(name, title):
+        clean_name = _normalize_board_member_text(name)
+        clean_title = _normalize_board_member_text(title)
+        if not clean_name or not clean_title:
+            return
+        if clean_name.lower() == clean_title.lower():
+            return
+        if not _is_person_like_name(clean_name):
+            return
+        if not _is_board_role_like(clean_title):
+            return
+        key = (clean_name.lower(), clean_title.lower())
+        if key in seen:
+            return
+        seen.add(key)
+        members.append({"name": clean_name, "title": clean_title})
+
+    for table in soup.find_all("table"):
+        headers = _extract_table_headers(table)
+        context_text = _get_table_context_text(table)
+        if not _looks_like_director_table(headers, context_text):
+            continue
+
+        name_index = _find_column_index(headers, ("name", "director", "nominee"), default=0)
+        title_index = _find_column_index(
+            headers,
+            ("occupation", "position", "title", "principal", "experience", "business"),
+            default=1,
+        )
+
+        rows = table.find_all("tr")
+        if headers and rows:
+            rows = rows[1:]
+
+        for row in rows:
+            data_cells = row.find_all("td")
+            if not data_cells:
+                continue
+            if max(name_index, title_index) >= len(data_cells):
+                continue
+            _add_member(
+                data_cells[name_index].get_text(" ", strip=True),
+                data_cells[title_index].get_text(" ", strip=True),
+            )
+
+    if members:
+        return members
+
+    return _parse_board_members_from_text(soup)
+
+
+def collect_board_members_by_year(
+    ticker,
+    company_title,
+    filings,
+    data_dir=DATA_DIR,
+):
+    logger.info("Entering collect_board_members_by_year")
+    data_dir = Path(data_dir)
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    board_members_by_year = []
+    member_years = {}
+
+    for filing in filings:
+        year = filing.get("year")
+        filing_url = filing.get("filing_url")
+        if not year or not filing_url:
+            continue
+
+        filing_html = _fetch_proxy_filing_html(filing_url)
+        if not filing_html:
+            continue
+
+        members = _extract_board_members_from_def14a_html(filing_html)
+        board_members_by_year.append(
+            {
+                "year": int(year) if str(year).isdigit() else year,
+                "members": members,
+            }
+        )
+
+        for member in members:
+            key = (member["name"], member["title"])
+            member_years.setdefault(key, set()).add(int(year))
+
+    board_members = [
+        {
+            "name": name,
+            "title": title,
+            "years_present": sorted(years),
+        }
+        for (name, title), years in member_years.items()
+    ]
+    board_members.sort(key=lambda member: (member["name"], member["title"]))
+
+    output_path = data_dir / f"{ticker.lower()}_def14a_board_members.json"
+    payload = {
+        "ticker": ticker,
+        "company_title": company_title,
+        "form_type": "DEF 14A",
+        "board_members": board_members,
+        "board_members_by_year": board_members_by_year,
+    }
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    record_document_lifecycle(
+        file_path=output_path,
+        stage="board_members_json_saved",
+        ticker=ticker,
+        form_type="DEF 14A",
+    )
+    return output_path
 
 # -------------------------------
 # XBRL Extraction and Cleaning
@@ -869,9 +1384,22 @@ def ingestion_filing(
         logger.error("Ingestion skipped: company lookup or filing download failed for %s", company_title)
         return None
 
-    folder, ticker = result
+    folder, ticker, cik, filtered_filings = result
     docling_json_path = f"{folder}_docling.json"
     xbrl_json_path = f"{folder}.json"
+    proxy_filings = _filter_def14a_filings(get_filings(cik))
+    subsidiaries_json_path = collect_subsidiaries_by_year(
+        cik=cik,
+        ticker=ticker,
+        company_title=company_title,
+        form_type=form_type,
+        filings=filtered_filings,
+    )
+    board_members_json_path = collect_board_members_by_year(
+        ticker=ticker,
+        company_title=company_title,
+        filings=proxy_filings,
+    )
 
     extract_xbrl_from_filings(folder)
     extract_docling_from_filings(folder, company_title=company_title, form_type=form_type)
@@ -896,6 +1424,8 @@ def ingestion_filing(
         "ticker": ticker,
         "docling_json_path": docling_json_path,
         "xbrl_json_path": xbrl_json_path,
+        "subsidiaries_json_path": Path(subsidiaries_json_path).as_posix(),
+        "board_members_json_path": Path(board_members_json_path).as_posix(),
     }
 
 

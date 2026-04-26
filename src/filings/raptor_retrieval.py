@@ -28,6 +28,7 @@ verifies the index; this module reads from that index for downstream LLM use.
 import os
 import math
 import logging
+import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Set
 
@@ -188,6 +189,37 @@ def deduplicate_by_id(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 def sort_nodes_by_score(nodes: List[Dict[str, Any]], descending: bool = True) -> List[Dict[str, Any]]:
     return sorted(nodes, key=lambda x: x.get("score", 0.0), reverse=descending)
+
+
+def _extract_year_from_query(query: str) -> Optional[int]:
+    match = re.search(r"\b(20\d{2})\b", query or "")
+    return int(match.group(1)) if match else None
+
+
+def _extract_form_type_from_query(query: str) -> Optional[str]:
+    normalized = str(query or "").upper()
+    if "10-K" in normalized:
+        return "10-K"
+    if "10-Q" in normalized:
+        return "10-Q"
+    return None
+
+
+def _derive_query_metadata_filter(
+    query: str,
+    metadata_filter: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    derived_filter = dict(metadata_filter or {})
+
+    form_type = _extract_form_type_from_query(query)
+    year = _extract_year_from_query(query)
+
+    if form_type is not None:
+        derived_filter["form_type"] = {"$eq": form_type}
+    if year is not None:
+        derived_filter["year"] = {"$eq": year}
+
+    return derived_filter or None
 
 
 # =========================================================
@@ -520,12 +552,13 @@ def raptor_retrieve(
     logger.info(f"RAPTOR retrieval started for query: {query}")
 
     query_vector = embed_query(query)
+    effective_metadata_filter = _derive_query_metadata_filter(query, metadata_filter)
 
     raw_matches = query_pinecone(
         query_vector=query_vector,
         top_k=top_k,
         namespace=namespace,
-        metadata_filter=metadata_filter,
+        metadata_filter=effective_metadata_filter,
         include_metadata=True
     )
 
