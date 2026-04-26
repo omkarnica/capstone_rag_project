@@ -167,3 +167,10 @@ def test_citation_accuracy_no_overlap():
         expected_sources=["AAPL 10-K 2024"],
     )
     assert score == 0.0
+
+
+def test_extract_numbers_ignores_years():
+    from evals.metrics.due_diligence import _extract_numbers
+    result = _extract_numbers("Apple FY2024 revenue was $391.0 billion.")
+    assert 2024.0 not in result
+    assert 391.0 in result

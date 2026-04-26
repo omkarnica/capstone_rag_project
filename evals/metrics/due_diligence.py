@@ -118,13 +118,20 @@ class CitationAccuracyMetric(BaseMetric):
 
 
 def _extract_numbers(text: str) -> list[float]:
-    """Extract all numeric values from text, stripping $ , B T suffixes."""
+    """Extract all numeric values from text, stripping $ , B T suffixes.
+
+    Excludes bare integers in the calendar year range (1900–2100) to prevent
+    false positives from dates like FY2024.
+    """
     pattern = r"\$?\s*(\d[\d,]*\.?\d*)\s*(?:billion|trillion|million|B|T|M)?"
     matches = re.findall(pattern, text, re.IGNORECASE)
     results = []
     for m in matches:
         try:
             val = float(m.replace(",", ""))
+            # Skip bare integers in calendar year range
+            if val == int(val) and 1900 <= val <= 2100:
+                continue
             results.append(val)
         except ValueError:
             pass
