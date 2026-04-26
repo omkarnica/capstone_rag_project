@@ -17,6 +17,8 @@ from src.nodes.fallback import web_search_fallback
 _RETRIEVAL_ROUTES = {"sql", "filings", "transcripts", "patents", "litigation", "graph"}
 
 
+# Not used by the compiled graph (build_graph uses an inner closure that also injects eval_config).
+# Retained for external callers that may reference it directly.
 def initialize_state(state: GraphState) -> GraphState:
     return {
         **state,

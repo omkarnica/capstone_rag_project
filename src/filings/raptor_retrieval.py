@@ -631,6 +631,7 @@ def retrieve_context_for_llm(
     metadata_filter: Optional[Dict[str, Any]] = None,
     max_children_per_summary: Optional[int] = None,
     use_simple_rerank: bool = False,
+    use_reranker: bool = True,
     max_chars: int = 12000,
 ) -> str:
     """
@@ -645,6 +646,7 @@ def retrieve_context_for_llm(
         metadata_filter=metadata_filter,
         max_children_per_summary=max_children_per_summary,
         use_simple_rerank=use_simple_rerank,
+        use_reranker=use_reranker,
     )
     return build_context_string(results.get("contexts", []), max_chars=max_chars)
 
