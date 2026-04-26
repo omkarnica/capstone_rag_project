@@ -12,6 +12,8 @@ class MRRMetric(BaseMetric):
     def __init__(self, threshold: float = 0.5):
         self.threshold = threshold
         self.score = 0.0
+        self.async_mode = False
+        self.success = False
 
     @property
     def __name__(self) -> str:
@@ -45,6 +47,8 @@ class NDCGMetric(BaseMetric):
         self.k = k
         self.threshold = threshold
         self.score = 0.0
+        self.async_mode = False
+        self.success = False
 
     @property
     def __name__(self) -> str:
@@ -57,10 +61,13 @@ class NDCGMetric(BaseMetric):
         relevance = [1 if s.lower() in expected_set else 0 for s in retrieved_sources]
         if sum(relevance) == 0:
             return 0.0
-        ideal = sorted(relevance, reverse=True)
+        if len(relevance) < 2:
+            return float(relevance[0]) if relevance else 0.0
+        n = len(retrieved_sources)
+        rank_scores = list(range(n, 0, -1))
         score = ndcg_score(
-            y_true=np.array([ideal]),
-            y_score=np.array([relevance]),
+            y_true=np.array([relevance]),
+            y_score=np.array([rank_scores]),
             k=self.k,
         )
         return float(score)

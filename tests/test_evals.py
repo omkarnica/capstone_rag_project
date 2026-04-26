@@ -71,3 +71,28 @@ def test_ndcg_none_relevant():
         expected_sources=["AAPL 10-K 2024"],
     )
     assert score == 0.0
+
+
+def test_ndcg_relevant_at_rank_two():
+    from evals.metrics.retrieval import NDCGMetric
+    import math
+    metric = NDCGMetric(k=3)
+    score = metric.compute(
+        retrieved_sources=["MSFT 10-K 2024", "AAPL 10-K 2024", "NVDA 10-K 2024"],
+        expected_sources=["AAPL 10-K 2024"],
+    )
+    # AAPL is at rank 2: DCG = 1/log2(3), ideal DCG = 1/log2(2)
+    # NDCG = (1/log2(3)) / (1/log2(2)) = log2(2)/log2(3) ≈ 0.6309
+    expected = math.log2(2) / math.log2(3)
+    assert abs(score - expected) < 1e-4
+
+
+def test_ndcg_single_relevant_doc():
+    from evals.metrics.retrieval import NDCGMetric
+    metric = NDCGMetric(k=3)
+    # Should not crash on single retrieved document
+    score = metric.compute(
+        retrieved_sources=["AAPL 10-K 2024"],
+        expected_sources=["AAPL 10-K 2024"],
+    )
+    assert score == 1.0
