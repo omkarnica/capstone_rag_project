@@ -211,3 +211,26 @@ def test_due_diligence_confidence_partial():
         citation_accuracy=0.0,
     )
     assert score == 0.0
+
+
+def test_contradiction_detection_rate_empty_contradictions():
+    from evals.metrics.due_diligence import ContradictionDetectionRate
+    m = ContradictionDetectionRate()
+    # Empty expected_contradictions → vacuously 1.0
+    score = m.compute(actual_output="Some answer.", expected_contradictions=[])
+    assert score == 1.0
+
+
+def test_contradiction_detection_rate_mocked():
+    from unittest.mock import MagicMock
+    from evals.metrics.due_diligence import ContradictionDetectionRate
+
+    mock_judge = MagicMock()
+    mock_judge.generate.return_value = '{"score": 0.75, "reason": "found 3 of 4 contradictions"}'
+
+    m = ContradictionDetectionRate(model=mock_judge)
+    score = m.compute(
+        actual_output="Nvidia's Q4 guidance was lower than actuals.",
+        expected_contradictions=["Revenue guidance overstated by 15%"],
+    )
+    assert score == 0.75

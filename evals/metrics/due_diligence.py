@@ -6,6 +6,9 @@ import re
 from deepeval.metrics import BaseMetric
 from deepeval.test_case import LLMTestCase
 
+# Regex to strip markdown JSON code fences
+_JSON_FENCE_RE = re.compile(r"^```(?:json|JSON)?\s*|\s*```$")
+
 
 class NumericalAccuracyMetric(BaseMetric):
     """Fraction of expected_numbers found in the answer within 1% tolerance."""
@@ -169,7 +172,8 @@ class CompletenessMetric(BaseMetric):
         )
         raw = self._get_model().generate(prompt)
         try:
-            data = json.loads(raw.strip().strip("```json").strip("```"))
+            cleaned = _JSON_FENCE_RE.sub("", raw.strip())
+            data = json.loads(cleaned)
             return float(data.get("score", 0.0))
         except (json.JSONDecodeError, ValueError):
             return 0.0
@@ -223,7 +227,8 @@ class ContradictionDetectionRate(BaseMetric):
         )
         raw = self._get_model().generate(prompt)
         try:
-            data = json.loads(raw.strip().strip("```json").strip("```"))
+            cleaned = _JSON_FENCE_RE.sub("", raw.strip())
+            data = json.loads(cleaned)
             return float(data.get("score", 0.0))
         except (json.JSONDecodeError, ValueError):
             return 0.0
