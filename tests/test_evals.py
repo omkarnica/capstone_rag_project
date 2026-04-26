@@ -21,3 +21,53 @@ def test_gemini_judge_generate_calls_genai():
 
     assert result == "yes"
     mock_client.models.generate_content.assert_called_once()
+
+
+def test_mrr_perfect_match():
+    from evals.metrics.retrieval import MRRMetric
+    metric = MRRMetric()
+    score = metric.compute(
+        retrieved_sources=["AAPL 10-K 2024", "MSFT 10-K 2024"],
+        expected_sources=["AAPL 10-K 2024"],
+    )
+    assert score == 1.0
+
+
+def test_mrr_second_position():
+    from evals.metrics.retrieval import MRRMetric
+    metric = MRRMetric()
+    score = metric.compute(
+        retrieved_sources=["MSFT 10-K 2024", "AAPL 10-K 2024"],
+        expected_sources=["AAPL 10-K 2024"],
+    )
+    assert score == 0.5
+
+
+def test_mrr_no_match():
+    from evals.metrics.retrieval import MRRMetric
+    metric = MRRMetric()
+    score = metric.compute(
+        retrieved_sources=["MSFT 10-K 2024"],
+        expected_sources=["AAPL 10-K 2024"],
+    )
+    assert score == 0.0
+
+
+def test_ndcg_perfect():
+    from evals.metrics.retrieval import NDCGMetric
+    metric = NDCGMetric(k=3)
+    score = metric.compute(
+        retrieved_sources=["AAPL 10-K 2024", "AAPL XBRL FY2024", "MSFT 10-K 2024"],
+        expected_sources=["AAPL 10-K 2024", "AAPL XBRL FY2024"],
+    )
+    assert score == 1.0
+
+
+def test_ndcg_none_relevant():
+    from evals.metrics.retrieval import NDCGMetric
+    metric = NDCGMetric(k=3)
+    score = metric.compute(
+        retrieved_sources=["NVDA 10-K 2024"],
+        expected_sources=["AAPL 10-K 2024"],
+    )
+    assert score == 0.0
