@@ -17,6 +17,8 @@ from src.nodes.fallback import web_search_fallback
 _RETRIEVAL_ROUTES = {"sql", "filings", "transcripts", "patents", "litigation", "graph"}
 
 
+# Not used by the compiled graph (build_graph uses an inner closure that also injects eval_config).
+# Retained for external callers that may reference it directly.
 def initialize_state(state: GraphState) -> GraphState:
     return {
         **state,
@@ -116,10 +118,22 @@ def retry_route(state: GraphState) -> str:
     return "end"
 
 
-def build_graph():
+def build_graph(eval_config: dict | None = None):
     graph = StateGraph(GraphState)
 
-    graph.add_node("initialize", initialize_state)
+    _eval_config = eval_config or {}
+
+    def _initialize_state(state: GraphState) -> GraphState:
+        return {
+            **state,
+            "iteration": state.get("iteration", 0),
+            "max_iterations": state.get("max_iterations", 3),
+            "retrieval_attempt": state.get("retrieval_attempt", 0),
+            "max_retrieval_attempts": state.get("max_retrieval_attempts", 3),
+            "eval_config": _eval_config,
+        }
+
+    graph.add_node("initialize", _initialize_state)
     graph.add_node("router", route_question)
 
     # M&A contradiction node (agentic — bypasses retrieve/grade/generate)

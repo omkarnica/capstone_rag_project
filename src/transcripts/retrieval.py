@@ -27,6 +27,7 @@ from google import genai
 from google.genai import types
 from pinecone import Pinecone
 
+from src.model_config import get_genai_client, get_model_name
 from src.utils.hybrid import hybrid_rrf_rank
 from src.utils.logger import get_logger
 from src.utils.secrets import get_secret
@@ -35,9 +36,6 @@ logger = get_logger(__name__)
 
 _INDEX_NAME   = "ragcapstone"
 _NAMESPACE    = "transcripts"
-_GCP_PROJECT  = "codelab-2-485215"
-_GCP_LOCATION = "us-central1"
-_LLM_MODEL    = "gemini-2.5-flash"
 _MAX_CONTEXT_CHARS = 10_000
 
 _SYSTEM_PROMPT = """\
@@ -66,7 +64,6 @@ def _normalize_company(name: str) -> str:
 
 
 _pc: Pinecone | None = None
-_genai_client: genai.Client | None = None
 
 
 def _get_pinecone() -> Pinecone:
@@ -74,17 +71,6 @@ def _get_pinecone() -> Pinecone:
     if _pc is None:
         _pc = Pinecone(api_key=get_secret("PINECONE_API_KEY"))
     return _pc
-
-
-def _get_genai() -> genai.Client:
-    global _genai_client
-    if _genai_client is None:
-        _genai_client = genai.Client(
-            vertexai=True,
-            project=_GCP_PROJECT,
-            location=_GCP_LOCATION,
-        )
-    return _genai_client
 
 
 def _build_filter(company: str | None, period_start: str | None, period_end: str | None) -> dict | None:
@@ -280,9 +266,9 @@ def generate_transcript_answer(
         f"Question: {query}"
     )
 
-    client = _get_genai()
+    client = get_genai_client()
     response = client.models.generate_content(
-        model=_LLM_MODEL,
+        model=get_model_name(),
         contents=user_prompt,
         config=types.GenerateContentConfig(system_instruction=_SYSTEM_PROMPT),
     )

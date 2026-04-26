@@ -25,15 +25,12 @@ import time
 from google import genai
 from google.genai import types
 
+from src.model_config import get_genai_client, get_model_name
 from src.nl_sql.pipeline import ask
 from src.transcripts.retrieval import generate_transcript_answer
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
-
-_GCP_PROJECT  = "codelab-2-485215"
-_GCP_LOCATION = "us-central1"
-_LLM_MODEL    = "gemini-2.5-flash"
 
 _SYSTEM_PROMPT = """\
 You are a forensic financial analyst performing M&A due diligence.
@@ -95,20 +92,6 @@ _DUE_DILIGENCE_METRICS: list[tuple[str, str, str]] = [
         "What did {company} say about cash position or liquidity in {period}?",
     ),
 ]
-
-_genai_client: genai.Client | None = None
-
-
-def _get_genai() -> genai.Client:
-    global _genai_client
-    if _genai_client is None:
-        _genai_client = genai.Client(
-            vertexai=True,
-            project=_GCP_PROJECT,
-            location=_GCP_LOCATION,
-        )
-    return _genai_client
-
 
 def _severity_from_score(score: int) -> str:
     if score <= 2:
@@ -213,9 +196,9 @@ def detect_contradiction(
 
     parsed: dict = {}
     try:
-        client = _get_genai()
+        client = get_genai_client()
         response = client.models.generate_content(
-            model=_LLM_MODEL,
+            model=get_model_name(),
             contents=user_prompt,
             config=types.GenerateContentConfig(system_instruction=_SYSTEM_PROMPT),
         )

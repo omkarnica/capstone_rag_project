@@ -30,7 +30,9 @@ def retrieve_docs(state: GraphState) -> GraphState:
     elif route == "filings":
         try:
             from src.filings.raptor_retrieval import raptor_retrieve
-            result = raptor_retrieve(query, top_k=10, final_top_k=6)
+            eval_config = state.get("eval_config") or {}
+            use_reranker = eval_config.get("reranker", True)
+            result = raptor_retrieve(query, top_k=10, final_top_k=6, use_reranker=use_reranker)
             docs = [
                 {
                     "content": c.get("text", ""),

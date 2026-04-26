@@ -112,31 +112,13 @@ class SemanticCache:
 
 ---
 
-### Step 1 — Fix LLM Layer: `pyproject.toml` + `src/model_config.py`
+### Step 1 — Fix LLM Layer: `pyproject.toml` + `src/model_config.py` ✅ DONE
 
-Add `langchain-google-vertexai>=2.0.0` to `pyproject.toml`. Rewrite `model_config.py`:
+Added `langchain-google-vertexai>=2.0.0` and switched the LangChain node LLM factory to `ChatVertexAI`. The 7 LangChain node functions (`get_router_llm`, etc.) were implemented as planned.
 
-```python
-from langchain_google_vertexai import ChatVertexAI
-
-_PROJECT = "codelab-2-485215"
-_LOCATION = "us-central1"
-_MODEL = "gemini-2.5-flash"
-
-def _get_llm(**kwargs) -> ChatVertexAI:
-    return ChatVertexAI(model=_MODEL, project=_PROJECT, location=_LOCATION,
-                        temperature=0, **kwargs)
-
-def get_router_llm(): return _get_llm()
-def get_planner_llm(): return _get_llm()
-def get_rewriter_llm(): return _get_llm()
-def get_grader_llm(): return _get_llm()
-def get_generation_llm(): return _get_llm()
-def get_direct_generation_llm(): return _get_llm()
-def get_merge_llm(): return _get_llm()
-```
-
-Remove all OpenAI/embedding functions (Pinecone hosted inference handles embeddings).
+**Follow-up (delivered on `feature/RG-Add-Audit-logs-and-fix-secrets-manager`, 2026-04-25):** Completed the model consolidation by auditing all `src/` modules. 7 modules were bypassing `model_config` with hardcoded `_GCP_PROJECT`/`_GCP_LOCATION`/`_LLM_MODEL` constants and private `genai.Client` factories. Fixed by:
+- Adding `get_genai_client()` (lazy singleton `genai.Client`) and `get_model_name()` to `model_config.py`
+- Migrating all 7 bypassing modules to import from `model_config`: `patents/retrieval.py`, `litigation/retrieval.py`, `transcripts/retrieval.py`, `contradictions/detector.py`, `nodes/fallback.py`, `nl_sql/pipeline.py`, `filings/raptor.py` (default only; YAML config preserved)
 
 ---
 
@@ -362,13 +344,21 @@ Keep `/query`, `/adaptive-query`, `/health`. Update CORS origins for M&A Oracle 
 
 ---
 
-## Out of Scope for This Branch (Future PRs)
+## Remaining / Pending Work
 
 Per architecture diagram — noted but not implemented here:
 - **Knowledge Graph** (`graph` route stubs to empty docs) — separate deliverable
 - **LangSmith / LangFuse observability** — separate integration PR
-- **Audit log** (query_id, tenant_id, sources, tokens/cost) — separate PR
 - **Slack webhook notifications** — separate PR
+
+Delivered in `feature/RG-Add-Audit-logs-and-fix-secrets-manager`:
+- **Secret Manager integration** — `src/utils/secrets.py` now caches secrets, falls back to `.env` for local dev, and preloads known secrets during FastAPI startup.
+- **BigQuery audit logging code** — `/query`, `/adaptive-query`, and `/api/query` now build audit records and write them to `codelab-2-485215.ma_oracle.audit_log` asynchronously.
+
+Pending admin/setup tasks before production use:
+- **Secret Manager provisioning** — create required secrets in GCP and grant runtime identity `Secret Manager Secret Accessor`.
+- **BigQuery provisioning** — enable BigQuery API, create the `ma_oracle.audit_log` table, and grant runtime identity `BigQuery Data Editor` + `BigQuery Job User`.
+- See `docs/gcp-local-setup.md` and `docs/bigquery-audit-setup.md`.
 
 > **Note:** BM25 hybrid search was delivered early in this branch via `src/utils/hybrid.py` — integrated into filings, litigation, and patents retrieval.
 
@@ -394,7 +384,11 @@ Per architecture diagram — noted but not implemented here:
 | `src/nodes/planner.py` | Replace Claude course heuristics with M&A source topics |
 | `src/nodes/fallback.py` | Rewritten — replace Brave Search with Google CSE; replace Anthropic domain trust with SEC/USPTO/CourtListener domain scoring; route-aware query rewriter |
 | `src/api.py` | Forward `company`/`period` to graph state; cache-scoped keys; `contradiction_report` in output |
-| `src/app.py` | Add `/due-diligence` endpoint with input validation (`fiscal_year` in [2000,2030], non-empty `company`); update title |
+| `src/app.py` | Add `/due-diligence` endpoint with input validation (`fiscal_year` in [2000,2030], non-empty `company`); update title; preload secrets at startup; emit audit records for query endpoints |
+| `src/utils/secrets.py` | Add cached Secret Manager lookup with `.env` fallback and startup preload for known app secrets |
+| `src/audit/logger.py` | New — build query audit records and write them to BigQuery |
+| `docs/gcp-local-setup.md` | New — local ADC, Secret Manager, and Vertex AI setup guide |
+| `docs/bigquery-audit-setup.md` | New — BigQuery dataset/table/IAM setup guide |
 | `src/filings/raptor_retrieval.py` | Integrate `hybrid_rrf_rank` replacing rerank fallback chain |
 | `src/litigation/retrieval.py` | Integrate `hybrid_rrf_rank` replacing `bge-reranker-v2-m3` API calls |
 | `src/patents/retrieval.py` | Integrate `hybrid_rrf_rank` replacing citation-boost reranker |
@@ -410,8 +404,11 @@ Per architecture diagram — noted but not implemented here:
 **Files unchanged** (already correct for M&A Oracle):
 - `src/nodes/grader.py`, `src/nodes/merge.py`, `src/nodes/rewriter.py`
 - `src/tiering.py`
-- `src/nl_sql/pipeline.py`, `src/contradictions/detector.py`
 - `src/xbrl/`
+
+**Files updated post-merge** (model_config consolidation on `feature/RG-Add-Audit-logs-and-fix-secrets-manager`):
+- `src/nl_sql/pipeline.py` — removed local GCP constants + module-level `genai.Client`; now uses `get_genai_client()` / `get_model_name()`
+- `src/contradictions/detector.py` — same pattern
 
 **Deleted** (were live-service demos masquerading as tests, invisible to pytest anyway):
 - `src/nodes/adaptive_test.py`, `graph_test.py`, `retriever_test.py`, `router_test.py`

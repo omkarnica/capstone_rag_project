@@ -1,12 +1,24 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+import time
+
 from src.api import run_adaptive_query, run_single_question
+from src.audit.logger import build_audit_record, log_query
+from src.eval_api import router as eval_router
+from src.utils.secrets import preload_secrets
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    preload_secrets()
+    yield
 
 
 class QueryRequest(BaseModel):
@@ -16,6 +28,8 @@ class QueryRequest(BaseModel):
     use_cache: bool = True
     company: str | None = None
     period: str | None = None
+    tenant_id: str = "default"
+    user_id: str = "anonymous"
 
 
 class DueDiligenceRequest(BaseModel):
@@ -32,6 +46,7 @@ class HealthResponse(BaseModel):
 app = FastAPI(
     title="M&A Oracle — Due Diligence Intelligence API",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -47,6 +62,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(eval_router)
+
 
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
@@ -54,8 +71,9 @@ def health() -> HealthResponse:
 
 
 def _run_query(payload: QueryRequest) -> dict[str, Any]:
+    start = time.monotonic()
     try:
-        return run_adaptive_query(
+        result = run_adaptive_query(
             question=payload.question,
             chunking_strategy=payload.chunking_strategy,
             similarity_threshold=payload.similarity_threshold,
@@ -65,6 +83,17 @@ def _run_query(payload: QueryRequest) -> dict[str, Any]:
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    latency_ms = int((time.monotonic() - start) * 1000)
+    record = build_audit_record(
+        question=payload.question,
+        result=result,
+        latency_ms=latency_ms,
+        tenant_id=payload.tenant_id,
+        user_id=payload.user_id,
+    )
+    log_query(record)
+    return result
 
 
 @app.post("/query")

@@ -6,17 +6,13 @@ from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
 from dotenv import load_dotenv
-from google import genai
 from google.genai import types
 
+from src.model_config import get_genai_client, get_model_name
 from src.state import GraphState
 from src.utils.secrets import get_secret
 
 load_dotenv()
-
-_GCP_PROJECT = "codelab-2-485215"
-_GCP_LOCATION = "us-central1"
-_GEMINI_MODEL = "gemini-2.5-flash"
 
 TRUSTED_MA_DOMAINS = [
     "sec.gov",
@@ -202,13 +198,9 @@ def _search_google(query: str, include_domains: list[str] | None = None) -> list
 
 
 def _search_with_gemini_google_tool(query: str) -> list[dict]:
-    client = genai.Client(
-        vertexai=True,
-        project=_GCP_PROJECT,
-        location=_GCP_LOCATION,
-    )
+    client = get_genai_client()
     response = client.models.generate_content(
-        model=_GEMINI_MODEL,
+        model=get_model_name(),
         contents=(
             "Search the web for authoritative M&A due diligence evidence. "
             "Prefer SEC, USPTO, CourtListener, regulator, and company investor "

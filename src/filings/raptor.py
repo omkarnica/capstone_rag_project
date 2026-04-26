@@ -42,6 +42,7 @@ from pinecone.grpc import PineconeGRPC as Pinecone
 from google import genai
 
 from .config_loader import load_config_yaml
+from src.model_config import get_model_name
 
 # =========================
 # CONFIG
@@ -70,7 +71,7 @@ PINECONE_INDEX_NAME = _cfg_str("PINECONE_INDEX_NAME", "ragcapstone")
 PINECONE_NAMESPACE = _cfg_str("PINECONE_NAMESPACE", "apple")
 RAPTOR_EMBED_MODEL = _cfg_str("RAPTOR_EMBED_MODEL", "all-MiniLM-L6-v2")
 PINECONE_EMBED_MODEL = _cfg_str("PINECONE_EMBED_MODEL", "llama-text-embed-v2")
-RAPTOR_SUMMARY_MODEL = _cfg_str("RAPTOR_SUMMARY_MODEL", "gemini-2.5-flash")
+RAPTOR_SUMMARY_MODEL = _cfg_str("RAPTOR_SUMMARY_MODEL", get_model_name())
 RAPTOR_SUMMARY_PROVIDER = _cfg_str("RAPTOR_SUMMARY_PROVIDER", "gemini").lower()
 RAPTOR_GEMINI_MODE = _cfg_str("RAPTOR_GEMINI_MODE", "vertex").lower()
 RAPTOR_EMBED_BATCH_SIZE = int(_cfg_str("RAPTOR_EMBED_BATCH_SIZE", "96"))

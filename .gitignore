@@ -19,6 +19,7 @@ __pycache__/
 # Logs
 *.log
 .cursor/
+.claude/settings.local.json
 
 ma_oracle.egg-info/
 # Added by code-review-graph
@@ -27,3 +28,6 @@ ma_oracle.egg-info/
 ma_oracle.egg-info/
 .pytest_cache/
 .env
+
+# Eval results (large, machine-generated)
+evals/results/*.json

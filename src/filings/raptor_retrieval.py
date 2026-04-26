@@ -504,6 +504,7 @@ def raptor_retrieve(
     metadata_filter: Optional[Dict[str, Any]] = None,
     max_children_per_summary: Optional[int] = None,
     use_simple_rerank: bool = False,
+    use_reranker: bool = True,
 ) -> Dict[str, Any]:
     """
     Full RAPTOR-aware retrieval:
@@ -546,13 +547,16 @@ def raptor_retrieve(
     logger.info(f"Combined leaf chunk nodes after summary expansion + dedup: {leaf_chunk_count}")
 
     dense_ranked_nodes = sort_nodes_by_score(combined_nodes)
-    ranked_nodes = hybrid_rrf_rank(
-        query,
-        dense_ranked_nodes,
-        text_getter=lambda node: str(node.get("text", "")),
-        key=lambda node: str(node.get("id") or ""),
-        top_k=final_top_k,
-    )
+    if use_reranker:
+        ranked_nodes = hybrid_rrf_rank(
+            query,
+            dense_ranked_nodes,
+            text_getter=lambda node: str(node.get("text", "")),
+            key=lambda node: str(node.get("id") or ""),
+            top_k=final_top_k,
+        )
+    else:
+        ranked_nodes = dense_ranked_nodes[:final_top_k]
 
     contexts = []
     for rank, node in enumerate(ranked_nodes, start=1):
@@ -627,6 +631,7 @@ def retrieve_context_for_llm(
     metadata_filter: Optional[Dict[str, Any]] = None,
     max_children_per_summary: Optional[int] = None,
     use_simple_rerank: bool = False,
+    use_reranker: bool = True,
     max_chars: int = 12000,
 ) -> str:
     """
@@ -641,6 +646,7 @@ def retrieve_context_for_llm(
         metadata_filter=metadata_filter,
         max_children_per_summary=max_children_per_summary,
         use_simple_rerank=use_simple_rerank,
+        use_reranker=use_reranker,
     )
     return build_context_string(results.get("contexts", []), max_chars=max_chars)
 
