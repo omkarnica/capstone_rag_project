@@ -1,0 +1,274 @@
+{
+  "ticker": "AAPL",
+  "company_title": "Apple Inc.",
+  "form_type": "DEF 14A",
+  "board_members": [
+    {
+      "name": "Al Gore",
+      "title": "Former Vice President of the United States",
+      "years_present": [
+        2023
+      ]
+    },
+    {
+      "name": "Alex Gorsky",
+      "title": "Executive Chair, Johnson & Johnson",
+      "years_present": [
+        2023
+      ]
+    },
+    {
+      "name": "Alex Gorsky",
+      "title": "Former Chair and CEO, Johnson & Johnson",
+      "years_present": [
+        2024,
+        2025
+      ]
+    },
+    {
+      "name": "Andrea Jung",
+      "title": "President and CEO, Grameen America",
+      "years_present": [
+        2023,
+        2024,
+        2025
+      ]
+    },
+    {
+      "name": "Art Levinson Board Chair",
+      "title": "Founder and CEO, Calico",
+      "years_present": [
+        2025
+      ]
+    },
+    {
+      "name": "Art Levinson Chair",
+      "title": "Founder and CEO, Calico",
+      "years_present": [
+        2023,
+        2024
+      ]
+    },
+    {
+      "name": "Deirdre OBrien",
+      "title": "Senior Vice President, Retail + People",
+      "years_present": [
+        2021
+      ]
+    },
+    {
+      "name": "James Bell",
+      "title": "Former CFO and Corporate President, The Boeing Company",
+      "years_present": [
+        2023
+      ]
+    },
+    {
+      "name": "Kate Adams",
+      "title": "Senior Vice President, General Counsel and Secretary",
+      "years_present": [
+        2021
+      ]
+    },
+    {
+      "name": "Luca Maestri",
+      "title": "Senior Vice President, Chief Financial Officer",
+      "years_present": [
+        2021
+      ]
+    },
+    {
+      "name": "Monica Lozano",
+      "title": "Former President and CEO, College Futures Foundation",
+      "years_present": [
+        2023,
+        2024,
+        2025
+      ]
+    },
+    {
+      "name": "Ron Sugar",
+      "title": "Former Chair and CEO, Northrop Grumman Corporation",
+      "years_present": [
+        2023,
+        2024,
+        2025
+      ]
+    },
+    {
+      "name": "Sue Wagner",
+      "title": "Co-founder and Director, BlackRock",
+      "years_present": [
+        2023,
+        2024,
+        2025
+      ]
+    },
+    {
+      "name": "Tim Cook",
+      "title": "CEO, Apple",
+      "years_present": [
+        2023,
+        2024,
+        2025
+      ]
+    },
+    {
+      "name": "Tim Cook",
+      "title": "Chief Executive Officer",
+      "years_present": [
+        2021
+      ]
+    },
+    {
+      "name": "Wanda Austin",
+      "title": "Former President and CEO, The Aerospace Corporation",
+      "years_present": [
+        2024,
+        2025
+      ]
+    }
+  ],
+  "board_members_by_year": [
+    {
+      "year": 2025,
+      "members": [
+        {
+          "name": "Art Levinson Board Chair",
+          "title": "Founder and CEO, Calico"
+        },
+        {
+          "name": "Tim Cook",
+          "title": "CEO, Apple"
+        },
+        {
+          "name": "Wanda Austin",
+          "title": "Former President and CEO, The Aerospace Corporation"
+        },
+        {
+          "name": "Alex Gorsky",
+          "title": "Former Chair and CEO, Johnson & Johnson"
+        },
+        {
+          "name": "Andrea Jung",
+          "title": "President and CEO, Grameen America"
+        },
+        {
+          "name": "Monica Lozano",
+          "title": "Former President and CEO, College Futures Foundation"
+        },
+        {
+          "name": "Ron Sugar",
+          "title": "Former Chair and CEO, Northrop Grumman Corporation"
+        },
+        {
+          "name": "Sue Wagner",
+          "title": "Co-founder and Director, BlackRock"
+        }
+      ]
+    },
+    {
+      "year": 2024,
+      "members": [
+        {
+          "name": "Art Levinson Chair",
+          "title": "Founder and CEO, Calico"
+        },
+        {
+          "name": "Tim Cook",
+          "title": "CEO, Apple"
+        },
+        {
+          "name": "Wanda Austin",
+          "title": "Former President and CEO, The Aerospace Corporation"
+        },
+        {
+          "name": "Alex Gorsky",
+          "title": "Former Chair and CEO, Johnson & Johnson"
+        },
+        {
+          "name": "Andrea Jung",
+          "title": "President and CEO, Grameen America"
+        },
+        {
+          "name": "Monica Lozano",
+          "title": "Former President and CEO, College Futures Foundation"
+        },
+        {
+          "name": "Ron Sugar",
+          "title": "Former Chair and CEO, Northrop Grumman Corporation"
+        },
+        {
+          "name": "Sue Wagner",
+          "title": "Co-founder and Director, BlackRock"
+        }
+      ]
+    },
+    {
+      "year": 2023,
+      "members": [
+        {
+          "name": "Art Levinson Chair",
+          "title": "Founder and CEO, Calico"
+        },
+        {
+          "name": "Tim Cook",
+          "title": "CEO, Apple"
+        },
+        {
+          "name": "James Bell",
+          "title": "Former CFO and Corporate President, The Boeing Company"
+        },
+        {
+          "name": "Al Gore",
+          "title": "Former Vice President of the United States"
+        },
+        {
+          "name": "Alex Gorsky",
+          "title": "Executive Chair, Johnson & Johnson"
+        },
+        {
+          "name": "Andrea Jung",
+          "title": "President and CEO, Grameen America"
+        },
+        {
+          "name": "Monica Lozano",
+          "title": "Former President and CEO, College Futures Foundation"
+        },
+        {
+          "name": "Ron Sugar",
+          "title": "Former Chair and CEO, Northrop Grumman Corporation"
+        },
+        {
+          "name": "Sue Wagner",
+          "title": "Co-founder and Director, BlackRock"
+        }
+      ]
+    },
+    {
+      "year": 2022,
+      "members": []
+    },
+    {
+      "year": 2021,
+      "members": [
+        {
+          "name": "Tim Cook",
+          "title": "Chief Executive Officer"
+        },
+        {
+          "name": "Luca Maestri",
+          "title": "Senior Vice President, Chief Financial Officer"
+        },
+        {
+          "name": "Kate Adams",
+          "title": "Senior Vice President, General Counsel and Secretary"
+        },
+        {
+          "name": "Deirdre OBrien",
+          "title": "Senior Vice President, Retail + People"
+        }
+      ]
+    }
+  ]
+}
