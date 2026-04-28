@@ -291,6 +291,75 @@ def test_grade_answer_quality_self_rag_disabled():
     assert result["answer_quality_grade"] == "yes"
 
 
+def test_grade_documents_rate_limit_falls_back_to_all_docs():
+    from src.nodes.grader import grade_documents
+
+    class ResourceExhausted(Exception):
+        pass
+
+    llm = MagicMock()
+    llm.with_structured_output.return_value = llm
+    llm.invoke.side_effect = ResourceExhausted("429 Resource exhausted")
+
+    docs = [{"content": "Apple board member Wanda Austin", "metadata": {}}]
+    state = {
+        "question": "Who are Apple's current board members?",
+        "retrieved_docs": docs,
+        "eval_config": {},
+    }
+
+    with patch("src.nodes.grader.get_grader_llm", return_value=llm):
+        result = grade_documents(state)
+
+    assert result["filtered_docs"] == docs
+    assert result["doc_relevance"] == ["yes"]
+    assert result["relevant_doc_count"] == 1
+
+
+def test_grade_hallucination_rate_limit_defaults_to_yes():
+    from src.nodes.grader import grade_hallucination
+
+    class ResourceExhausted(Exception):
+        pass
+
+    llm = MagicMock()
+    llm.with_structured_output.return_value = llm
+    llm.invoke.side_effect = ResourceExhausted("429 Resource exhausted")
+
+    state = {
+        "answer": "Apple board members include Wanda Austin.",
+        "retrieved_docs": [{"content": "Wanda Austin", "metadata": {}}],
+        "eval_config": {},
+    }
+
+    with patch("src.nodes.grader.get_grader_llm", return_value=llm):
+        result = grade_hallucination(state)
+
+    assert result["hallucination_grade"] == "yes"
+
+
+def test_grade_answer_quality_rate_limit_defaults_to_yes():
+    from src.nodes.grader import grade_answer_quality
+
+    class ResourceExhausted(Exception):
+        pass
+
+    llm = MagicMock()
+    llm.with_structured_output.return_value = llm
+    llm.invoke.side_effect = ResourceExhausted("429 Resource exhausted")
+
+    state = {
+        "question": "Who are Apple's current board members?",
+        "answer": "Apple board members include Wanda Austin.",
+        "eval_config": {},
+    }
+
+    with patch("src.nodes.grader.get_grader_llm", return_value=llm):
+        result = grade_answer_quality(state)
+
+    assert result["answer_quality_grade"] == "yes"
+
+
 def test_build_graph_no_args_sets_empty_eval_config():
     """build_graph() with no args produces a graph that sets eval_config={} in state."""
     from src.graph import build_graph

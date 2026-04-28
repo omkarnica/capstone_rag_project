@@ -12,12 +12,14 @@ import time
 from src.api import run_adaptive_query, run_single_question
 from src.audit.logger import build_audit_record, log_query
 from src.eval_api import router as eval_router
+from src.observability import configure_langsmith_environment
 from src.utils.secrets import preload_secrets
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     preload_secrets()
+    configure_langsmith_environment()
     yield
 
 
@@ -80,6 +82,9 @@ def _run_query(payload: QueryRequest) -> dict[str, Any]:
             use_cache=payload.use_cache,
             company=payload.company,
             period=payload.period,
+            tenant_id=payload.tenant_id,
+            user_id=payload.user_id,
+            trace_source="api",
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

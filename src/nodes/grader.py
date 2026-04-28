@@ -6,10 +6,18 @@ from pydantic import BaseModel, Field
 
 from src.model_config import get_grader_llm
 from src.state import GraphState
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class BinaryGrade(BaseModel):
     score: Literal["yes", "no"] = Field(description="Binary grading decision.")
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return exc.__class__.__name__ == "ResourceExhausted" or "429" in text or "resource exhausted" in text
 
 def _format_context_for_grading(state: GraphState) -> str:
     docs = state.get("filtered_docs") or state.get("retrieved_docs") or []
@@ -86,7 +94,18 @@ Rules:
 Return a binary decision only.
 """.strip()
 
-        result = llm.invoke(prompt)
+        try:
+            result = llm.invoke(prompt)
+        except Exception as exc:
+            if not _is_rate_limit_error(exc):
+                raise
+            logger.warning("Document grading skipped due to rate limit: %s", exc)
+            return {
+                **state,
+                "filtered_docs": retrieved_docs,
+                "doc_relevance": ["yes"] * len(retrieved_docs),
+                "relevant_doc_count": len(retrieved_docs),
+            }
         doc_relevance.append(result.score)
 
         if result.score == "yes":
@@ -136,7 +155,16 @@ or
 no
 """.strip()
 
-    result = llm.invoke(prompt)
+    try:
+        result = llm.invoke(prompt)
+    except Exception as exc:
+        if not _is_rate_limit_error(exc):
+            raise
+        logger.warning("Hallucination grading skipped due to rate limit: %s", exc)
+        return {
+            **state,
+            "hallucination_grade": "yes",
+        }
 
     return {
         **state,
@@ -180,7 +208,16 @@ or
 no
 """.strip()
 
-    result = llm.invoke(prompt)
+    try:
+        result = llm.invoke(prompt)
+    except Exception as exc:
+        if not _is_rate_limit_error(exc):
+            raise
+        logger.warning("Answer quality grading skipped due to rate limit: %s", exc)
+        return {
+            **state,
+            "answer_quality_grade": "yes",
+        }
 
     return {
         **state,

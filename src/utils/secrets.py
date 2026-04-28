@@ -14,6 +14,7 @@ logger = get_logger(__name__)
 _KNOWN_SECRETS = [
     "PINECONE_API_KEY",
     "COURTLISTENER_API_KEY",
+    "LangSmith_key",
 ]
 
 
