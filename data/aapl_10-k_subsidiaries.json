@@ -1,0 +1,133 @@
+{
+  "ticker": "AAPL",
+  "company_title": "Apple Inc.",
+  "form_type": "10-K",
+  "subsidiaries_by_year": [
+    {
+      "year": 2025,
+      "accession": "000032019325000079",
+      "exhibit_21_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/a10-kexhibit21109272025.htm",
+      "subsidiaries": [
+        "Apple Asia Limited",
+        "Apple Asia LLC",
+        "Apple Canada Inc.",
+        "Apple Computer Trading (Shanghai) Co., Ltd.",
+        "Apple Distribution International Limited",
+        "Apple India Private Limited",
+        "Apple Insurance Company, Inc.",
+        "Apple Japan, Inc.",
+        "Apple Korea Limited",
+        "Apple Operations International Limited",
+        "Apple Operations Limited",
+        "Apple Operations Mexico, S.A. de C.V.",
+        "Apple Pty Limited",
+        "Apple Services Pte. Ltd.",
+        "Apple South Asia (Thailand) Limited",
+        "Apple South Asia Pte. Ltd.",
+        "Apple Vietnam Limited Liability Company",
+        "Braeburn Capital, Inc.",
+        "iTunes K.K."
+      ]
+    },
+    {
+      "year": 2024,
+      "accession": "000032019324000123",
+      "exhibit_21_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/a10-kexhibit21109282024.htm",
+      "subsidiaries": [
+        "Apple Asia Limited",
+        "Apple Asia LLC",
+        "Apple Canada Inc.",
+        "Apple Computer Trading (Shanghai) Co., Ltd.",
+        "Apple Distribution International Limited",
+        "Apple India Private Limited",
+        "Apple Insurance Company, Inc.",
+        "Apple Japan, Inc.",
+        "Apple Korea Limited",
+        "Apple Operations International Limited",
+        "Apple Operations Limited",
+        "Apple Operations Mexico, S.A. de C.V.",
+        "Apple Pty Limited",
+        "Apple Sales International Limited",
+        "Apple South Asia (Thailand) Limited",
+        "Apple Vietnam Limited Liability Company",
+        "Braeburn Capital, Inc.",
+        "iTunes K.K."
+      ]
+    },
+    {
+      "year": 2023,
+      "accession": "000032019323000106",
+      "exhibit_21_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/a10-kexhibit21109302023.htm",
+      "subsidiaries": [
+        "Apple Asia Limited",
+        "Apple Asia LLC",
+        "Apple Canada Inc.",
+        "Apple Computer Trading (Shanghai) Co., Ltd.",
+        "Apple Distribution International Limited",
+        "Apple India Private Limited",
+        "Apple Insurance Company, Inc.",
+        "Apple Japan, Inc.",
+        "Apple Korea Limited",
+        "Apple Operations International Limited",
+        "Apple Operations Limited",
+        "Apple Operations Mexico, S.A. de C.V.",
+        "Apple Pty Limited",
+        "Apple Sales International Limited",
+        "Apple South Asia (Thailand) Limited",
+        "Apple Vietnam Limited Liability Company",
+        "Braeburn Capital, Inc.",
+        "iTunes K.K."
+      ]
+    },
+    {
+      "year": 2022,
+      "accession": "000032019322000108",
+      "exhibit_21_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019322000108/a10-kexhibit21109242022.htm",
+      "subsidiaries": [
+        "Apple Asia Limited",
+        "Apple Asia LLC",
+        "Apple Canada Inc.",
+        "Apple Computer Trading (Shanghai) Co., Ltd.",
+        "Apple Distribution International Limited",
+        "Apple India Private Limited",
+        "Apple Insurance Company, Inc.",
+        "Apple Japan, Inc.",
+        "Apple Korea Limited",
+        "Apple Operations Europe Limited",
+        "Apple Operations International Limited",
+        "Apple Operations Limited",
+        "Apple Operations Mexico, S.A. de C.V.",
+        "Apple Pty Limited",
+        "Apple Sales International Limited",
+        "Apple South Asia (Thailand) Limited",
+        "Apple Vietnam Limited Liability Company",
+        "Braeburn Capital, Inc.",
+        "iTunes K.K."
+      ]
+    },
+    {
+      "year": 2021,
+      "accession": "000032019321000105",
+      "exhibit_21_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019321000105/a10-kexhibit2119252021.htm",
+      "subsidiaries": [
+        "Apple Asia Limited",
+        "Apple Asia LLC",
+        "Apple Canada Inc.",
+        "Apple Computer Trading (Shanghai) Co., Ltd.",
+        "Apple Distribution International Limited",
+        "Apple Insurance Company, Inc.",
+        "Apple Japan, Inc.",
+        "Apple Korea Limited",
+        "Apple Operations Europe Limited",
+        "Apple Operations International Limited",
+        "Apple Operations Limited",
+        "Apple Pty Limited",
+        "Apple Sales International Limited",
+        "Apple South Asia (Thailand) Limited",
+        "Braeburn Capital, Inc.",
+        "iTunes K.K.",
+        "Limited Liability Company Apple Rus"
+      ]
+    }
+  ]
+}
