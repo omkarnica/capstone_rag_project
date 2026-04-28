@@ -13,10 +13,6 @@ logger = get_logger(__name__)
 # All secrets the app uses — fetched eagerly at startup
 _KNOWN_SECRETS = [
     "PINECONE_API_KEY",
-    "GOOGLE_SEARCH_API_KEY",
-    "GOOGLE_SEARCH_ENGINE_ID",
-    "GOOGLE_CSE_ID",
-    "DB_PASSWORD",
     "COURTLISTENER_API_KEY",
 ]
 
