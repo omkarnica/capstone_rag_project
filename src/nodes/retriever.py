@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from src.graph_retrieval import retrieve_graph_docs
 from src.state import GraphState
 from src.utils.logger import get_logger
 
@@ -104,8 +105,13 @@ def retrieve_docs(state: GraphState) -> GraphState:
         except Exception as exc:
             logger.warning("Litigation retrieval failed: %s", exc)
 
-    # graph, contradiction, llm_direct — no retrieval here
-    # contradiction is handled by its own node; graph is a stub
+    elif route == "graph":
+        try:
+            docs = retrieve_graph_docs(query, company=company)
+        except Exception as exc:
+            logger.warning("Graph retrieval failed: %s", exc)
+
+    # contradiction, llm_direct — no retrieval here
 
     return {
         **state,
