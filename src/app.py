@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 import time
 
+from src.cache.semantic_cache import get_cache_backend
 from src.api import run_adaptive_query, run_single_question
 from src.audit.logger import build_audit_record, log_query
 from src.eval_api import router as eval_router
@@ -45,6 +46,19 @@ class HealthResponse(BaseModel):
     status: str
 
 
+class CacheStatsResponse(BaseModel):
+    backend: str
+    doc_version: int
+    exact: dict[str, int]
+    semantic: dict[str, int]
+    retrieval: dict[str, int]
+
+
+class CacheClearResponse(BaseModel):
+    status: str
+    cleared: dict[str, int]
+
+
 app = FastAPI(
     title="M&A Oracle — Due Diligence Intelligence API",
     version="0.1.0",
@@ -70,6 +84,25 @@ app.include_router(eval_router)
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse(status="ok")
+
+
+@app.get("/cache/stats", response_model=CacheStatsResponse)
+def cache_stats() -> dict[str, Any]:
+    backend = get_cache_backend()
+    if backend is None:
+        raise HTTPException(status_code=503, detail="Cache backend is unavailable")
+    return backend.get_stats()
+
+
+@app.post("/cache/clear", response_model=CacheClearResponse)
+def cache_clear() -> dict[str, Any]:
+    backend = get_cache_backend()
+    if backend is None:
+        raise HTTPException(status_code=503, detail="Cache backend is unavailable")
+    return {
+        "status": "ok",
+        "cleared": backend.clear_all(),
+    }
 
 
 def _run_query(payload: QueryRequest) -> dict[str, Any]:

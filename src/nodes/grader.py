@@ -42,6 +42,25 @@ def _format_context_for_grading(state: GraphState) -> str:
     return ""
 
 
+def _grade_graph_documents(state: GraphState) -> GraphState:
+    docs = state.get("retrieved_docs", [])
+    if not docs:
+        return {
+            **state,
+            "filtered_docs": [],
+            "doc_relevance": [],
+            "relevant_doc_count": 0,
+        }
+
+    doc_relevance = ["yes"] * len(docs)
+    return {
+        **state,
+        "filtered_docs": docs,
+        "doc_relevance": doc_relevance,
+        "relevant_doc_count": len(docs),
+    }
+
+
 def grade_documents(state: GraphState) -> GraphState:
     """
     Corrective RAG:
@@ -69,6 +88,9 @@ def grade_documents(state: GraphState) -> GraphState:
             "doc_relevance": [],
             "relevant_doc_count": 0,
         }
+
+    if state.get("route") == "graph":
+        return _grade_graph_documents(state)
 
     llm = get_grader_llm().with_structured_output(BinaryGrade)
 

@@ -13,8 +13,11 @@ logger = get_logger(__name__)
 # All secrets the app uses — fetched eagerly at startup
 _KNOWN_SECRETS = [
     "PINECONE_API_KEY",
-    "COURTLISTENER_API_KEY",
+    "COURTLISTNER_API_KEY",
     "LangSmith_key",
+    "NEO4J_URI",
+    "NEO4J_USER",
+    "NEO4J_PASSWORD",
 ]
 
 
