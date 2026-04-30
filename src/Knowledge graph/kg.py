@@ -7,6 +7,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
+
 from src.filings.config_loader import load_config_yaml
 
 try:
@@ -20,6 +22,8 @@ logger = logging.getLogger("filings_kg")
 
 CONFIG_PATH = Path(__file__).resolve().parents[1] / "filings" / "config.yaml"
 _CONFIG = load_config_yaml(CONFIG_PATH)
+
+load_dotenv()
 
 
 def _resolve_neo4j_settings(config: dict[str, Any] | None = None) -> tuple[str, str, str]:

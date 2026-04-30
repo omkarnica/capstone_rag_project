@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from src.model_config import get_router_llm
+from src.nodes.graph_topics import is_graph_topic
 from src.state import GraphState
 
 _VALID_ROUTES = {
@@ -74,6 +75,14 @@ def route_question(state: GraphState) -> GraphState:
     question = state["question"]
     route_hint = state.get("route_hint", "none") or "none"
     force_route = state.get("force_route", False)
+
+    if is_graph_topic(question):
+        return {
+            **state,
+            "route": "graph",
+            "initial_route": "graph",
+            "route_reason": "Deterministic graph-topic routing",
+        }
 
     if force_route and route_hint in _VALID_ROUTES:
         return {

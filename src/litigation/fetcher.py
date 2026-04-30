@@ -10,7 +10,7 @@ fetch_opinion_text:
     Falls back to empty string if plain_text is unavailable.
 
 API:  https://www.courtlistener.com/api/rest/v4/
-Auth: Optional token stored as COURTLISTENER_API_KEY in GCP Secret Manager / .env.
+Auth: Optional token stored as COURTLISTNER_API_KEY in GCP Secret Manager / .env.
       Unauthenticated requests are allowed but rate-limited to ~5k/day.
 """
 
@@ -35,9 +35,9 @@ _POLITE_DELAY = 0.25  # seconds between paginated requests
 
 
 def _headers() -> dict:
-    """Return auth headers if COURTLISTENER_API_KEY is available."""
+    """Return auth headers if COURTLISTNER_API_KEY is available."""
     try:
-        token = get_secret("COURTLISTENER_API_KEY")
+        token = get_secret("COURTLISTNER_API_KEY")
         return {"Authorization": f"Token {token}"}
     except Exception:
         return {}
