@@ -6,8 +6,11 @@ import re
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
+
 from src.filings.config_loader import load_config_yaml
 from src.model_config import get_graph_llm
+from src.utils.secrets import get_secret
 
 try:
     from neo4j import GraphDatabase
@@ -18,6 +21,8 @@ except ImportError:  # pragma: no cover - exercised in environments without neo4
 CONFIG_PATH = Path(__file__).resolve().parent / "filings" / "config.yaml"
 _CONFIG = load_config_yaml(CONFIG_PATH)
 _DRIVER = None
+
+load_dotenv()
 
 _GRAPH_SCHEMA = """
 Nodes:
@@ -51,11 +56,34 @@ _WRITE_KEYWORDS = {
     "CALL",
 }
 
+_LEGAL_COMPANY_SUFFIXES = (
+    "Inc.",
+    "Corp.",
+    "Corporation",
+    "Ltd.",
+    "Limited",
+    "LLC",
+    "PLC",
+    "Group",
+    "Holdings",
+)
+
 
 def _resolve_neo4j_settings() -> tuple[str, str, str]:
-    neo4j_uri = os.getenv("NEO4J_URI") or str(_CONFIG.get("NEO4J_URI", "bolt://localhost:7687"))
-    neo4j_user = os.getenv("NEO4J_USER") or str(_CONFIG.get("NEO4J_USER", "neo4j"))
-    neo4j_password = os.getenv("NEO4J_PASSWORD") or str(_CONFIG.get("NEO4J_PASSWORD", "password"))
+    neo4j_uri = os.getenv("NEO4J_URI")
+    neo4j_user = os.getenv("NEO4J_USER")
+    neo4j_password = os.getenv("NEO4J_PASSWORD")
+
+    if not neo4j_uri:
+        secret_id = str(_CONFIG.get("NEO4J_URI_SECRET", "NEO4J_URI"))
+        neo4j_uri = get_secret(secret_id)
+    if not neo4j_user:
+        secret_id = str(_CONFIG.get("NEO4J_USER_SECRET", "NEO4J_USER"))
+        neo4j_user = get_secret(secret_id)
+    if not neo4j_password:
+        secret_id = str(_CONFIG.get("NEO4J_PASSWORD_SECRET", "NEO4J_PASSWORD"))
+        neo4j_password = get_secret(secret_id)
+
     return neo4j_uri, neo4j_user, neo4j_password
 
 
@@ -94,8 +122,24 @@ def validate_read_only_cypher(cypher: str) -> str:
     return normalized
 
 
+def _extract_company_full_name(question: str) -> str | None:
+    suffix_pattern = "|".join(re.escape(suffix) for suffix in _LEGAL_COMPANY_SUFFIXES)
+    match = re.search(
+        rf"([A-Z][A-Za-z0-9&.\-]*(?:\s+[A-Z][A-Za-z0-9&.\-]*)*\s+(?:{suffix_pattern}))",
+        question,
+    )
+    return match.group(1).strip() if match else None
+
+
 def _graph_prompt(question: str, *, company: str | None = None) -> str:
     company_hint = f"Preferred company ticker: {company.upper()}" if company else "No preferred company ticker"
+    company_full_name = _extract_company_full_name(question)
+    company_name_hint = (
+        f"Preferred company full name: {company_full_name}\n"
+        "Preserve the full company name exactly in the Cypher match when filtering by Company.name."
+        if company_full_name
+        else "No preferred company full name"
+    )
     return f"""
 You translate M&A due diligence questions into Cypher for Neo4j.
 
@@ -104,13 +148,23 @@ Allowed clauses: MATCH, OPTIONAL MATCH, WHERE, WITH, RETURN, ORDER BY, LIMIT.
 Never use CREATE, MERGE, DELETE, DETACH, SET, REMOVE, DROP, LOAD, FOREACH, or CALL.
 Return at most 10 rows.
 If the user asks about a company and a ticker hint is available, use it.
+If the graph stores a company under its full legal name, prefer the exact stored company name over a shortened variant.
+Always use the company title if ticker is not available.(Eg- for Apple, use "Apple Inc." if that's how it's stored in the graph, not just "Apple".)
 Prefer returning named columns with human-readable aliases.
+Return semantic aliases instead of opaque abbreviations where possible.
+Include company and year fields when available.
+For board-member questions, prefer years_present, is_current, and explicit year filtering when the question mentions a year.
+Treat years_present as a list/array field. For year membership use `YEAR IN node.years_present`, not string checks like `CONTAINS "2024"`.
+For subsidiary questions, include company and source-form context when available.
+For filing questions, include form type, year, filing_id, source_file, and section context when available.
+For patent questions, include patent_id, patent_title, grant_date, grant_year, and domain fields when available.
 Return only Cypher. No explanation. No markdown unless it is a single cypher fence.
 
 Schema:
 {_GRAPH_SCHEMA}
 
 {company_hint}
+{company_name_hint}
 
 Question:
 {question}
@@ -130,10 +184,160 @@ def _format_value(value: Any) -> str:
     return str(value)
 
 
+def _generic_row_lines(row: dict[str, Any]) -> list[str]:
+    return [f"{key}: {_format_value(value)}" for key, value in row.items()]
+
+
+def _row_value(row: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if key in row:
+            return row[key]
+    return None
+
+
+def _looks_like_board_member_row(row: dict[str, Any]) -> bool:
+    keys = {key.lower() for key in row}
+    return ("board_member" in keys or "boardmembername" in keys or "member_name" in keys) and (
+        "title" in keys or "boardmembertitle" in keys
+    )
+
+
+def _format_board_member_row(row: dict[str, Any]) -> str:
+    company = _row_value(row, "company", "CompanyName", "company_name", "ticker", "Ticker") or "Company"
+    year = _row_value(row, "year", "Year")
+    name = _row_value(row, "board_member", "BoardMemberName", "member_name", "MemberName") or "Unknown"
+    title = _row_value(row, "title", "BoardMemberTitle", "member_title", "MemberTitle")
+    years_present = _row_value(row, "years_present", "YearsPresent")
+
+    head = f"{company} board member in {year}: {name}" if year else f"{company} board member: {name}"
+    details = []
+    if title:
+        details.append(f"Title: {title}")
+    if years_present:
+        details.append(f"Years present: {_format_value(years_present)}")
+    return " | ".join([head, *details]) if details else head
+
+
+def _looks_like_subsidiary_row(row: dict[str, Any]) -> bool:
+    keys = {key.lower() for key in row}
+    return "subsidiary" in keys or "subsidiary_name" in keys
+
+
+def _format_subsidiary_row(row: dict[str, Any]) -> str:
+    company = _row_value(
+        row,
+        "company",
+        "Company",
+        "CompanyName",
+        "company_name",
+        "ticker",
+        "Ticker",
+    ) or "Company"
+    year = _row_value(row, "year", "Year")
+    name = _row_value(
+        row,
+        "subsidiary",
+        "SubsidiaryName",
+        "Subsidiary_Name",
+        "subsidiary_name",
+    ) or "Unknown"
+    source_form_type = _row_value(row, "source_form_type", "SourceFormType")
+
+    head = f"{company} subsidiary in {year}: {name}" if year else f"{company} subsidiary: {name}"
+    details = [f"Source form: {source_form_type}"] if source_form_type else []
+    return " | ".join([head, *details]) if details else head
+
+
+def _looks_like_filing_row(row: dict[str, Any]) -> bool:
+    keys = {key.lower() for key in row}
+    return "filing_id" in keys and "form_type" in keys
+
+
+def _format_filing_row(row: dict[str, Any]) -> str:
+    company = _row_value(row, "company", "CompanyName", "company_name", "ticker", "Ticker") or "Company"
+    year = _row_value(row, "year", "Year")
+    form_type = _row_value(row, "form_type", "FormType") or "Filing"
+    filing_id = _row_value(row, "filing_id", "FilingId", "FilingID")
+    source_file = _row_value(row, "source_file", "SourceFile")
+
+    parts = [f"{company} filing: {year} {form_type}" if year else f"{company} filing: {form_type}"]
+    if filing_id:
+        parts.append(f"Filing ID: {filing_id}")
+    if source_file:
+        parts.append(f"Source file: {source_file}")
+    return " | ".join(parts)
+
+
+def _looks_like_section_row(row: dict[str, Any]) -> bool:
+    keys = {key.lower() for key in row}
+    return ("section_id" in keys and "text" in keys) or "section_title" in keys
+
+
+def _format_section_row(row: dict[str, Any]) -> str:
+    company = _row_value(row, "company", "CompanyName", "company_name", "ticker", "Ticker") or "Company"
+    year = _row_value(row, "year", "Year")
+    form_type = _row_value(row, "form_type", "FormType")
+    title = _row_value(row, "section_title", "SectionTitle", "title", "Title") or "Untitled section"
+    section_id = _row_value(row, "section_id", "SectionId", "SectionID")
+    text = _row_value(row, "text", "Text")
+
+    head = f"{company} {year} {form_type} section: {title}" if year and form_type else f"{company} filing section: {title}"
+    detail_parts = [f"Section ID: {section_id}"] if section_id else []
+    body = f"{head} | {' | '.join(detail_parts)}" if detail_parts else head
+    return f"{body}\n{text}" if text else body
+
+
+def _looks_like_patent_row(row: dict[str, Any]) -> bool:
+    keys = {key.lower() for key in row}
+    return "patent_id" in keys or "patent_title" in keys
+
+
+def _format_patent_row(row: dict[str, Any]) -> str:
+    company = _row_value(row, "company", "CompanyName", "company_name", "ticker", "Ticker") or "Company"
+    patent_id = _row_value(row, "patent_id", "PatentId", "PatentID") or "Unknown patent"
+    title = _row_value(row, "patent_title", "PatentTitle", "title", "Title")
+    grant_date = _row_value(row, "grant_date", "GrantDate")
+    domain = _row_value(row, "domain", "Domain", "cpc_prefix", "CpcPrefix", "CPCPrefix")
+
+    parts = [f"{company} patent: {patent_id}"]
+    if title:
+        parts.append(f"Title: {title}")
+    if grant_date:
+        parts.append(f"Grant date: {grant_date}")
+    if domain:
+        parts.append(f"Domain: {domain}")
+    return " | ".join(parts)
+
+
+def _looks_like_domain_row(row: dict[str, Any]) -> bool:
+    keys = {key.lower() for key in row}
+    return "cpc_prefix" in keys and "label" in keys and "patent_id" not in keys
+
+
+def _format_domain_row(row: dict[str, Any]) -> str:
+    company = _row_value(row, "company", "CompanyName", "company_name", "ticker", "Ticker") or "Company"
+    prefix = _row_value(row, "cpc_prefix", "CpcPrefix", "CPCPrefix") or "Unknown"
+    label = _row_value(row, "label", "Label") or "Unknown domain"
+    return f"{company} technology domain: {prefix} | {label}"
+
+
 def _row_to_doc(row: dict[str, Any], *, cypher: str) -> dict[str, Any]:
-    lines = [f"{key}: {_format_value(value)}" for key, value in row.items()]
+    if _looks_like_board_member_row(row):
+        content = _format_board_member_row(row)
+    elif _looks_like_subsidiary_row(row):
+        content = _format_subsidiary_row(row)
+    elif _looks_like_section_row(row):
+        content = _format_section_row(row)
+    elif _looks_like_filing_row(row):
+        content = _format_filing_row(row)
+    elif _looks_like_patent_row(row):
+        content = _format_patent_row(row)
+    elif _looks_like_domain_row(row):
+        content = _format_domain_row(row)
+    else:
+        content = "\n".join(_generic_row_lines(row))
     return {
-        "content": "\n".join(lines),
+        "content": content,
         "metadata": {
             "source": "Knowledge Graph",
             "title": "Neo4j Graph Result",

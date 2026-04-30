@@ -79,6 +79,13 @@ def _web_citations(results: List[dict]) -> List[str]:
     return citations
 
 
+def _is_knowledge_graph_docs(docs: List[dict]) -> bool:
+    return bool(docs) and all(
+        (doc.get("metadata", {}).get("source") or "").strip() == "Knowledge Graph"
+        for doc in docs
+    )
+
+
 def _answer_style_instructions(question: str, *, direct: bool = False) -> str:
     lowered = question.lower().strip()
     asks_yes_no = lowered.startswith(
@@ -137,6 +144,69 @@ def _answer_style_instructions(question: str, *, direct: bool = False) -> str:
     return "\n".join(instructions)
 
 
+def _build_answer_prompt(question: str, *, docs: List[dict], web_results: List[dict]) -> str:
+    if docs:
+        context = _format_doc_context(docs)
+        if _is_knowledge_graph_docs(docs):
+            source_mode = "knowledge_graph"
+            source_instructions = "\n".join(
+                [
+                    "The context comes from a knowledge graph.",
+                    "Treat each graph row as a factual assertion, not as a vague hint.",
+                    "Answer directly from the graph facts when the entity and relationship are explicit.",
+                    "Write a natural, user-friendly answer that reads like analyst prose, not a database dump.",
+                    "Do not just echo raw retrieved lines or field labels back to the user.",
+                    "Do not say 'the context lists', 'the provided context states', or similar meta phrasing.",
+                    "Do not include inline citation tags like [source | date] in the answer text.",
+                    "When the question asks for multiple people, subsidiaries, filings, or patents, name them directly in a readable list.",
+                ]
+            )
+        else:
+            source_mode = "documents"
+            source_instructions = "\n".join(
+                [
+                    "The context comes from retrieved documents.",
+                    "Answer directly from the evidence without narrating the retrieval process.",
+                    "Write a natural, user-friendly answer rather than echoing document fragments verbatim.",
+                    "Do not include inline citation tags like [source | date] in the answer text.",
+                ]
+            )
+    else:
+        context = _format_web_context(web_results)
+        source_mode = "web"
+        source_instructions = "\n".join(
+            [
+                "The context comes from grounded web results.",
+                "Answer directly from the evidence without narrating the retrieval process.",
+                "Write a natural, user-friendly answer rather than echoing web snippets verbatim.",
+                "Do not include inline citation tags like [source | date] in the answer text.",
+            ]
+        )
+
+    return f"""
+You are a forensic financial analyst assistant for M&A due diligence.
+
+Answer the user's question using ONLY the provided context.
+Do not invent facts or speculate beyond the evidence.
+Flag any material risks or anomalies explicitly when the question calls for them.
+If the context is insufficient, say so clearly in one short sentence.
+
+Source guidance:
+{source_instructions}
+
+Output rules:
+{_answer_style_instructions(question)}
+
+Question:
+{question}
+
+Context source type: {source_mode}
+
+Context:
+{context}
+""".strip()
+
+
 def generate_answer(state: GraphState) -> GraphState:
     """
     Generate a grounded answer from:
@@ -152,13 +222,9 @@ def generate_answer(state: GraphState) -> GraphState:
     web_search_error = state.get("web_search_error")
 
     if docs:
-        context = _format_doc_context(docs)
         citations = _doc_citations(docs)
-        source_mode = "documents"
     elif web_results:
-        context = _format_web_context(web_results)
         citations = _web_citations(web_results)
-        source_mode = "web"
     elif web_search_error:
         return {
             **state,
@@ -172,27 +238,7 @@ def generate_answer(state: GraphState) -> GraphState:
             "citations": [],
         }
 
-    prompt = f"""
-You are a forensic financial analyst assistant for M&A due diligence.
-
-Answer the user's question using ONLY the provided context from SEC filings, earnings transcripts, patents, or litigation records.
-Do not invent facts or speculate beyond the evidence.
-Cite every factual claim with [source | date] format.
-Flag any material risks or anomalies explicitly.
-If the context is insufficient, say so clearly in one sentence.
-
-Output rules:
-{_answer_style_instructions(question)}
-
-Question:
-{question}
-
-Context source type: {source_mode}
-
-Context:
-{context}
-""".strip()
-
+    prompt = _build_answer_prompt(question, docs=docs, web_results=web_results)
     response = llm.invoke(prompt)
 
     return {

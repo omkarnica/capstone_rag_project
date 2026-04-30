@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from src.model_config import get_planner_llm
+from src.nodes.graph_topics import is_graph_topic
 from src.tiering import tier_for_plan
 
 RouteHint = Literal[
@@ -149,6 +150,8 @@ def _guess_route_hint(question: str) -> RouteHint:
         if any(m in lowered for m in TRANSCRIPT_MARKERS) or any(m in lowered for m in FILING_MARKERS):
             return "contradiction"
 
+    if is_graph_topic(question):
+        return "graph"
     if any(m in lowered for m in FINANCIAL_MARKERS):
         return "sql"
     if any(m in lowered for m in FILING_MARKERS):

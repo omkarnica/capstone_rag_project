@@ -24,6 +24,10 @@ def _get_backend() -> Optional[RedisCacheBackend]:
     return _backend_instance
 
 
+def get_cache_backend() -> Optional[RedisCacheBackend]:
+    return _get_backend()
+
+
 def is_time_sensitive_question(question: str) -> bool:
     return any(t in question.lower() for t in _RECENCY_TERMS)
 

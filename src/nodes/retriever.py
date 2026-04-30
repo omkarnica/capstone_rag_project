@@ -13,6 +13,8 @@ def retrieve_docs(state: GraphState) -> GraphState:
     query = state.get("rewritten_question") or state["question"]
     company = state.get("company")
     docs: list[dict] = []
+    filings_error = False
+    filings_empty = False
 
     if route == "sql":
         try:
@@ -45,7 +47,10 @@ def retrieve_docs(state: GraphState) -> GraphState:
                 }
                 for c in result.get("contexts", [])
             ]
+            filings_empty = len(docs) == 0
         except Exception as exc:
+            filings_error = True
+            filings_empty = True
             logger.warning("Filings retrieval failed: %s", exc)
 
     elif route == "transcripts":
@@ -120,4 +125,6 @@ def retrieve_docs(state: GraphState) -> GraphState:
         "filtered_docs": [],
         "doc_relevance": [],
         "relevant_doc_count": 0,
+        "filings_error": filings_error,
+        "filings_empty": filings_empty,
     }
