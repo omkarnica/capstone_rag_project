@@ -29,9 +29,9 @@ Nodes:
 - (:Company {ticker, name})
 - (:Filing {filing_id, form_type, year, source_file})
 - (:Section {section_id, title, text, ordinal, year, form_type})
-- (:Subsidiary {subsidiary_id, name})
+- (:Subsidiary {subsidiary_id, name, years_present})
 - (:BoardMember {id, name, title, is_current, years_present})
-- (:Patent {patent_id, patent_title, grant_date, assignee_organization, cpc_subclass})
+- (:Patent {patent_id, patent_title, grant_date,grant_year, assignee_organization, cpc_subclass})
 - (:TechnologyDomain {cpc_prefix, label, section})
 
 Relationships:
@@ -141,23 +141,47 @@ def _graph_prompt(question: str, *, company: str | None = None) -> str:
         else "No preferred company full name"
     )
     return f"""
-You translate M&A due diligence questions into Cypher for Neo4j.
+You translate M&A due diligence questions into Cypher for Neo4j. Use only the schema below. Produce exactly one read-only Cypher query.
 
-Use only the schema below. Produce exactly one read-only Cypher query.
 Allowed clauses: MATCH, OPTIONAL MATCH, WHERE, WITH, RETURN, ORDER BY, LIMIT.
 Never use CREATE, MERGE, DELETE, DETACH, SET, REMOVE, DROP, LOAD, FOREACH, or CALL.
 Return at most 10 rows.
+
 If the user asks about a company and a ticker hint is available, use it.
 If the graph stores a company under its full legal name, prefer the exact stored company name over a shortened variant.
-Always use the company title if ticker is not available.(Eg- for Apple, use "Apple Inc." if that's how it's stored in the graph, not just "Apple".)
+Always use the company title if ticker is not available. (e.g. for Apple, use "Apple Inc." if that's how it's stored in the graph, not just "Apple".)
+
 Prefer returning named columns with human-readable aliases.
 Return semantic aliases instead of opaque abbreviations where possible.
 Include company and year fields when available.
+
 For board-member questions, prefer years_present, is_current, and explicit year filtering when the question mentions a year.
 Treat years_present as a list/array field. For year membership use `YEAR IN node.years_present`, not string checks like `CONTAINS "2024"`.
-For subsidiary questions, include company and source-form context when available.
+
+For subsidiary questions:
+- The Subsidiary node has a `years_present` field which is a list of years (e.g. [2021, 2022, 2023]).
+- ALWAYS filter by `WHERE <year> IN s.years_present` when the question mentions a year.
+- If no year is mentioned, return all subsidiaries without a year filter.
+- Always include s.years_present in the RETURN clause.
+- Always use DISTINCT to prevent duplicate rows.
+- Always return company name and subsidiary name.
+
 For filing questions, include form type, year, filing_id, source_file, and section context when available.
 For patent questions, include patent_id, patent_title, grant_date, grant_year, and domain fields when available.
+
+YEAR FILTERING RULES (critical):
+- If the question mentions a year, you MUST apply a WHERE filter on the relevant node's year field.
+- Never silently drop a year filter.
+- For subsidiaries:   WHERE <year> IN s.years_present
+- For filings:        WHERE f.year = <year>
+- For board members:  WHERE <year> IN b.years_present
+- For patents:        WHERE p.grant_year = <year>
+- If no year field exists on the target node, add a comment: // NOTE: year filter not applicable - no year field on this node type
+
+DEDUPLICATION RULES (critical):
+- Always use DISTINCT in RETURN clauses to prevent duplicate rows.
+- For subsidiaries specifically: RETURN DISTINCT c.name, s.name, s.years_present
+
 Return only Cypher. No explanation. No markdown unless it is a single cypher fence.
 
 Schema:
@@ -203,7 +227,15 @@ def _looks_like_board_member_row(row: dict[str, Any]) -> bool:
 
 
 def _format_board_member_row(row: dict[str, Any]) -> str:
-    company = _row_value(row, "company", "CompanyName", "company_name", "ticker", "Ticker") or "Company"
+    company = _row_value(
+        row,
+        "company",
+        "Company",
+        "CompanyName",
+        "company_name",
+        "ticker",
+        "Ticker",
+    ) or "Company"
     year = _row_value(row, "year", "Year")
     name = _row_value(row, "board_member", "BoardMemberName", "member_name", "MemberName") or "Unknown"
     title = _row_value(row, "title", "BoardMemberTitle", "member_title", "MemberTitle")

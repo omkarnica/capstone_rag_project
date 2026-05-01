@@ -20,8 +20,16 @@ import psycopg2
 from psycopg2.extensions import connection as PgConnection
 from src.utils.exceptions import db_error_boundary
 from src.utils.logger import get_logger
+from src.utils.secrets import get_secret
 
 logger = get_logger(__name__)
+
+
+def _get_database_url() -> str | None:
+    try:
+        return get_secret("DATABASE_URL")
+    except Exception:
+        return None
 
 
 def get_connection(
@@ -35,6 +43,11 @@ def get_connection(
     Create a PostgreSQL connection using explicit args or env defaults.
     """
     with db_error_boundary("connect"):
+        database_url = None
+        if not any(value is not None for value in (host, port, dbname, user, password)):
+            database_url = _get_database_url()
+        if database_url:
+            return psycopg2.connect(database_url)
         return psycopg2.connect(
             host=host or os.getenv("PGHOST", "localhost"),
             port=port or int(os.getenv("PGPORT", "5433")),

@@ -18,6 +18,8 @@ _KNOWN_SECRETS = [
     "NEO4J_URI",
     "NEO4J_USER",
     "NEO4J_PASSWORD",
+    "REDIS_HOST",
+    "REDIS_PORT",
 ]
 
 
