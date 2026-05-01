@@ -139,14 +139,14 @@ def query(payload: QueryRequest) -> dict[str, Any]:
     return _run_query(payload)
 
 
-@app.post("/adaptive-query")
-def adaptive_query(payload: QueryRequest) -> dict[str, Any]:
-    return _run_query(payload)
+# @app.post("/adaptive-query")
+# def adaptive_query(payload: QueryRequest) -> dict[str, Any]:
+#     return _run_query(payload)
 
 
-@app.post("/api/query")
-def api_query(payload: QueryRequest) -> dict[str, Any]:
-    return _run_query(payload)
+# @app.post("/api/query")
+# def api_query(payload: QueryRequest) -> dict[str, Any]:
+#     return _run_query(payload)
 
 
 @app.post("/due-diligence")

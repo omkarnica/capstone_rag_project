@@ -32,6 +32,8 @@ def test_preload_secrets_requests_courtlistener_api_key() -> None:
     assert "NEO4J_URI" in requested_secret_ids
     assert "NEO4J_USER" in requested_secret_ids
     assert "NEO4J_PASSWORD" in requested_secret_ids
+    assert "REDIS_HOST" in requested_secret_ids
+    assert "REDIS_PORT" in requested_secret_ids
 
 
 def test_courtlistener_headers_use_secret_manager_key_name() -> None:

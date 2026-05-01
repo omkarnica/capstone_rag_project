@@ -108,6 +108,20 @@ def test_graph_prompt_instructs_semantic_aliases_and_year_fields() -> None:
     assert "for patent questions" in prompt.lower()
 
 
+def test_graph_prompt_requires_year_aware_distinct_subsidiary_queries() -> None:
+    from src.graph_retrieval import _graph_prompt
+
+    prompt = _graph_prompt("List the subsidiaries of Apple in 2025", company="AAPL")
+    lowered = prompt.lower()
+
+    assert "if the question mentions a specific year" in lowered
+    assert "must preserve that time constraint" in lowered
+    assert "for subsidiary questions that mention a year" in lowered
+    assert "filter to that year" in lowered
+    assert "prefer distinct subsidiary names for list queries" in lowered
+    assert "do not ignore an explicit year constraint" in lowered
+
+
 def test_graph_prompt_surfaces_exact_company_name_hint_from_question() -> None:
     from src.graph_retrieval import _graph_prompt
 
@@ -169,6 +183,22 @@ def test_board_member_row_formats_capitalized_aliases_with_year_and_company() ->
     assert "Years present: [2023, 2024]" in doc["content"]
 
 
+def test_board_member_row_formats_company_alias() -> None:
+    from src.graph_retrieval import _row_to_doc
+
+    row = {
+        "Company": "Apple Inc.",
+        "Year": 2024,
+        "BoardMemberName": "Tim Cook",
+        "BoardMemberTitle": "CEO, Apple",
+    }
+
+    doc = _row_to_doc(row, cypher="MATCH ... RETURN ...")
+
+    assert "Apple Inc. board member in 2024: Tim Cook" in doc["content"]
+    assert "Title: CEO, Apple" in doc["content"]
+
+
 def test_subsidiary_row_formats_as_explicit_evidence() -> None:
     from src.graph_retrieval import _row_to_doc
 
@@ -196,6 +226,32 @@ def test_subsidiary_row_formats_langsmith_style_aliases() -> None:
     doc = _row_to_doc(row, cypher="MATCH ... RETURN ...")
 
     assert "Apple Inc. subsidiary: Apple Operations International Limited" in doc["content"]
+
+
+def test_subsidiary_row_formats_company_and_subsidiary_aliases() -> None:
+    from src.graph_retrieval import _row_to_doc
+
+    row = {
+        "Company": "Apple Inc.",
+        "Subsidiary": "Apple Sales International",
+    }
+
+    doc = _row_to_doc(row, cypher="MATCH ... RETURN ...")
+
+    assert "Apple Inc. subsidiary: Apple Sales International" in doc["content"]
+
+
+def test_subsidiary_row_recognizes_subsidiary_name_alias() -> None:
+    from src.graph_retrieval import _row_to_doc
+
+    row = {
+        "Company": "Apple Inc.",
+        "SubsidiaryName": "Braeburn Capital, Inc.",
+    }
+
+    doc = _row_to_doc(row, cypher="MATCH ... RETURN ...")
+
+    assert "Apple Inc. subsidiary: Braeburn Capital, Inc." in doc["content"]
 
 
 def test_filing_row_formats_as_explicit_evidence() -> None:
