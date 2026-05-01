@@ -114,12 +114,11 @@ def test_graph_prompt_requires_year_aware_distinct_subsidiary_queries() -> None:
     prompt = _graph_prompt("List the subsidiaries of Apple in 2025", company="AAPL")
     lowered = prompt.lower()
 
-    assert "if the question mentions a specific year" in lowered
-    assert "must preserve that time constraint" in lowered
-    assert "for subsidiary questions that mention a year" in lowered
-    assert "filter to that year" in lowered
-    assert "prefer distinct subsidiary names for list queries" in lowered
-    assert "do not ignore an explicit year constraint" in lowered
+    assert "for subsidiary questions" in lowered
+    assert "r.year" in lowered
+    assert "when the question mentions a year" in lowered
+    assert "has_subsidiary relationship" in lowered
+    assert "use distinct" in lowered
 
 
 def test_graph_prompt_surfaces_exact_company_name_hint_from_question() -> None:

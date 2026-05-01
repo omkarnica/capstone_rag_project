@@ -77,6 +77,61 @@
     "route": "sql"
   },
   {
+    "id": "t1_008",
+    "tier": 1,
+    "query": "Who were the board members of Apple Inc. in 2023?",
+    "expected_answer": "Apple's board members in 2023 included Tim Cook, Arthur Levinson (Chair), Jeff Williams, James Bell, Al Gore, Andrea Jung, Ron Sugar, Sue Wagner, and Monica Lozano.",
+    "expected_sources": ["Knowledge Graph"],
+    "expected_entities": ["Apple", "Tim Cook", "Arthur Levinson", "board member"],
+    "expected_numbers": [],
+    "expected_contradictions": [],
+    "route": "graph"
+  },
+  {
+    "id": "t1_009",
+    "tier": 1,
+    "query": "Who are the current board members of Apple Inc.?",
+    "expected_answer": "Apple's current board members include Tim Cook (CEO), Arthur Levinson (Chairman), and other independent directors as disclosed in the most recent proxy statement.",
+    "expected_sources": ["Knowledge Graph"],
+    "expected_entities": ["Apple", "Tim Cook", "Arthur Levinson", "director"],
+    "expected_numbers": [],
+    "expected_contradictions": [],
+    "route": "graph"
+  },
+  {
+    "id": "t1_010",
+    "tier": 1,
+    "query": "List all subsidiaries of Apple Inc. reported in 2023.",
+    "expected_answer": "Apple's 2023 subsidiaries include Apple Operations International, Apple Sales International, Apple Operations Europe, Braeburn Capital Inc., and other entities disclosed in Exhibit 21.",
+    "expected_sources": ["Knowledge Graph"],
+    "expected_entities": ["Apple", "Apple Operations International", "Apple Sales International", "subsidiary"],
+    "expected_numbers": [],
+    "expected_contradictions": [],
+    "route": "graph"
+  },
+  {
+    "id": "t1_011",
+    "tier": 1,
+    "query": "What is the ownership structure and corporate hierarchy of Apple Inc.?",
+    "expected_answer": "Apple Inc. is the parent entity with subsidiaries across multiple jurisdictions including Ireland (Apple Operations International, Apple Sales International), Europe (Apple Operations Europe), and the US (Braeburn Capital).",
+    "expected_sources": ["Knowledge Graph"],
+    "expected_entities": ["Apple", "subsidiaries", "ownership structure"],
+    "expected_numbers": [],
+    "expected_contradictions": [],
+    "route": "graph"
+  },
+  {
+    "id": "t1_012",
+    "tier": 1,
+    "query": "List the directors on Apple's board of directors in 2022.",
+    "expected_answer": "Apple's board of directors in 2022 included Tim Cook, Arthur Levinson (Chairman), James Bell, Al Gore, Andrea Jung, Ron Sugar, Sue Wagner, Monica Lozano, and other independent directors.",
+    "expected_sources": ["Knowledge Graph"],
+    "expected_entities": ["Apple", "Tim Cook", "Arthur Levinson", "board of directors"],
+    "expected_numbers": [],
+    "expected_contradictions": [],
+    "route": "graph"
+  },
+  {
     "id": "t2_001",
     "tier": 2,
     "query": "Compare Apple's revenue recognition policy language across 10-K filings from 2021 to 2024. Has anything material changed?",

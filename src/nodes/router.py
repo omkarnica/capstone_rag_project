@@ -38,7 +38,7 @@ Choose exactly one route based on what the query needs:
 - litigation   — court cases, lawsuits, settlements, legal exposure, litigation risk,
                  CourtListener data
 - graph        — entity relationships, subsidiaries, board connections, ownership structure,
-                 corporate hierarchy (NOTE: stub — may return limited results)
+                 corporate hierarchy, board member history, subsidiary listings
 - contradiction — compare management statements vs. filed disclosures, detect discrepancies
                  between what was said on earnings calls and what SEC filings show,
                  due diligence contradiction analysis
