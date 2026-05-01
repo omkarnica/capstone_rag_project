@@ -12,6 +12,12 @@
 
 ---
 
+## Demo
+
+https://github.com/omkarnica/capstone_rag_project/raw/dev/docs/MandA%20Oracle_demo.mp4
+
+---
+
 ## The Scenario
 
 A private equity firm is considering acquiring a tech company for $2B. Analysts need to answer: *Is the CEO's public optimism consistent with what the financial filings actually say? Are there hidden liabilities in the footnotes?*
