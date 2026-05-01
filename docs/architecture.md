@@ -57,7 +57,7 @@ same LangGraph workflow. `src/nodes/merge.py` combines the sub-results before th
 final generation step.
 
 ## Storage
-- PostgreSQL stores structured SEC/XBRL facts, transcript metadata, patent metadata,
+- Supabase DB in Cloud stores structured SEC/XBRL facts, transcript metadata, patent metadata,
   and litigation metadata.
 - Pinecone stores text chunks for filings, transcripts, patents, and litigation.
 - Neo4j stores the knowledge graph: company–filing–section–subsidiary–board–patent
@@ -85,7 +85,7 @@ in a background thread. Structured application logs use `src/utils/logger.py`.
   reranking (`bge-reranker-v2-m3`).
 - Neo4j for knowledge graph storage and Cypher query execution.
 - LangSmith for LLM call tracing and observability.
-- GCP Secret Manager for runtime secret resolution.
+- GCP Secret Manager for storing secrets and  runtime secret resolution.
 - Gemini Google Search grounding for web fallback when internal retrieval is
   insufficient.
 
