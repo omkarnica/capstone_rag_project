@@ -86,7 +86,10 @@ class RedisCacheBackend(CacheBackend):
 
     def get_semantic(self, embedding, threshold, source_filter=""):
         current_version = self.get_doc_version()
-        member_ids = self._redis.smembers(_SEMANTIC_INDEX)
+        now = time.time()
+        # Proactively remove expired members from the index before scanning.
+        self._redis.zremrangebyscore(_SEMANTIC_INDEX, 0, now)
+        member_ids = self._redis.zrange(_SEMANTIC_INDEX, 0, -1)
         if not member_ids:
             return None
         best_match = None
@@ -96,12 +99,12 @@ class RedisCacheBackend(CacheBackend):
             key = f"{_SEMANTIC_PREFIX}{self._str(member_id)}"
             data = self._redis.get(key)
             if data is None:
-                self._redis.srem(_SEMANTIC_INDEX, member_id)
+                self._redis.zrem(_SEMANTIC_INDEX, member_id)
                 continue
             entry = json.loads(data)
             if entry.get("doc_version", 0) < current_version:
                 self._redis.delete(key)
-                self._redis.srem(_SEMANTIC_INDEX, member_id)
+                self._redis.zrem(_SEMANTIC_INDEX, member_id)
                 continue
             if entry.get("source_filter", "") != source_filter:
                 continue
@@ -139,14 +142,18 @@ class RedisCacheBackend(CacheBackend):
             "hit_count": 0,
             "last_hit_at": None,
         }
+        expiry_ts = time.time() + ttl_seconds
         self._redis.setex(key, ttl_seconds, json.dumps(entry).encode("utf-8"))
-        self._redis.sadd(_SEMANTIC_INDEX, entry_id.encode("utf-8"))
+        # Score = expiry timestamp so zremrangebyscore can auto-clean expired members.
+        self._redis.zadd(_SEMANTIC_INDEX, {entry_id.encode("utf-8"): expiry_ts})
 
     # ── Tier 3: Retrieval Cache ────────────────────────────────
 
     def get_retrieval(self, embedding, threshold, source_filter=""):
         current_version = self.get_doc_version()
-        member_ids = self._redis.smembers(_RETRIEVAL_INDEX)
+        now = time.time()
+        self._redis.zremrangebyscore(_RETRIEVAL_INDEX, 0, now)
+        member_ids = self._redis.zrange(_RETRIEVAL_INDEX, 0, -1)
         if not member_ids:
             return None
         best_match = None
@@ -156,12 +163,12 @@ class RedisCacheBackend(CacheBackend):
             key = f"{_RETRIEVAL_PREFIX}{self._str(member_id)}"
             data = self._redis.get(key)
             if data is None:
-                self._redis.srem(_RETRIEVAL_INDEX, member_id)
+                self._redis.zrem(_RETRIEVAL_INDEX, member_id)
                 continue
             entry = json.loads(data)
             if entry.get("doc_version", 0) < current_version:
                 self._redis.delete(key)
-                self._redis.srem(_RETRIEVAL_INDEX, member_id)
+                self._redis.zrem(_RETRIEVAL_INDEX, member_id)
                 continue
             if entry.get("source_filter", "") != source_filter:
                 continue
@@ -197,8 +204,9 @@ class RedisCacheBackend(CacheBackend):
             "hit_count": 0,
             "last_hit_at": None,
         }
+        expiry_ts = time.time() + ttl_seconds
         self._redis.setex(key, ttl_seconds, json.dumps(entry).encode("utf-8"))
-        self._redis.sadd(_RETRIEVAL_INDEX, entry_id.encode("utf-8"))
+        self._redis.zadd(_RETRIEVAL_INDEX, {entry_id.encode("utf-8"): expiry_ts})
 
     # ── Management ─────────────────────────────────────────────
 
@@ -219,12 +227,12 @@ class RedisCacheBackend(CacheBackend):
                 self._redis.delete(*keys)
             if cursor == 0:
                 break
-        member_ids = self._redis.smembers(_SEMANTIC_INDEX)
+        member_ids = self._redis.zrange(_SEMANTIC_INDEX, 0, -1)
         for member_id in member_ids:
             self._redis.delete(f"{_SEMANTIC_PREFIX}{self._str(member_id)}")
         counts["semantic"] = len(member_ids)
         self._redis.delete(_SEMANTIC_INDEX)
-        member_ids = self._redis.smembers(_RETRIEVAL_INDEX)
+        member_ids = self._redis.zrange(_RETRIEVAL_INDEX, 0, -1)
         for member_id in member_ids:
             self._redis.delete(f"{_RETRIEVAL_PREFIX}{self._str(member_id)}")
         counts["retrieval"] = len(member_ids)
@@ -233,7 +241,7 @@ class RedisCacheBackend(CacheBackend):
 
     def get_stats(self) -> dict:
         def _count_and_hits(index_key, prefix):
-            member_ids = self._redis.smembers(index_key)
+            member_ids = self._redis.zrange(index_key, 0, -1)
             entries = 0
             total_hits = 0
             for member_id in member_ids:
@@ -264,15 +272,9 @@ class RedisCacheBackend(CacheBackend):
         }
 
     def cleanup_expired(self) -> int:
-        removed = 0
-        for index_key, prefix in [
-            (_SEMANTIC_INDEX, _SEMANTIC_PREFIX),
-            (_RETRIEVAL_INDEX, _RETRIEVAL_PREFIX),
-        ]:
-            for member_id in self._redis.smembers(index_key):
-                if not self._redis.exists(f"{prefix}{self._str(member_id)}"):
-                    self._redis.srem(index_key, member_id)
-                    removed += 1
+        now = time.time()
+        removed = int(self._redis.zremrangebyscore(_SEMANTIC_INDEX, 0, now) or 0)
+        removed += int(self._redis.zremrangebyscore(_RETRIEVAL_INDEX, 0, now) or 0)
         return removed
 
     # ── Document Hash Deduplication ──────────────────────────────

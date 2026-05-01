@@ -228,9 +228,11 @@ def _average_scores(score_list: list[dict]) -> dict[str, float]:
 def _extract_company(query: str) -> str | None:
     query_lower = query.lower()
     if "apple" in query_lower or "aapl" in query_lower:
-        return "Apple"
+        return "AAPL"
     if "microsoft" in query_lower or "msft" in query_lower:
-        return "Microsoft"
+        return "MSFT"
     if "nvidia" in query_lower or "nvda" in query_lower:
-        return "Nvidia"
+        return "NVDA"
+    if "meta" in query_lower or "facebook" in query_lower:
+        return "META"
     return None

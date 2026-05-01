@@ -19,15 +19,18 @@ ABLATION_CONFIGS: dict[str, dict] = {
         "corrective": False,
         "self_rag": False,
     },
+    "plus_kg": {
+        "router": True,
+        "reranker": True,
+        "corrective": True,
+        "self_rag": True,
+        "kg": True,
+    },
     "full_system": {
         "router": True,
         "reranker": True,
         "corrective": True,
         "self_rag": True,
+        "kg": True,
     },
-    # Plug in when teammate's KG branch merges:
-    # "plus_kg": {
-    #     "router": True, "reranker": True, "corrective": True,
-    #     "self_rag": True, "kg": True,
-    # },
 }
