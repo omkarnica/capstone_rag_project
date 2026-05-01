@@ -3,6 +3,7 @@ Adapter exposing the interface api.py expects:
   SemanticCache, compute_corpus_version, is_time_sensitive_question
 """
 
+import hashlib
 import json
 from typing import Optional
 
@@ -42,12 +43,61 @@ def compute_corpus_version(chunking_strategy: str = "hierarchical") -> int:
         return 0
 
 
+def _question_hash(question: str, source_filter: str) -> str:
+    return hashlib.sha256(f"{question}|{source_filter}".encode()).hexdigest()
+
+
 class SemanticCache:
+
+    def get_exact(
+        self,
+        question: str,
+        corpus_version: int,
+        chunking_strategy: str,
+    ) -> Optional[dict]:
+        backend = _get_backend()
+        if backend is None:
+            return None
+        try:
+            raw = backend.get_exact(_question_hash(question, chunking_strategy))
+        except Exception:
+            return None
+        if raw is None:
+            return None
+        try:
+            return json.loads(raw["answer"])
+        except (json.JSONDecodeError, KeyError, TypeError):
+            return {
+                "final_answer": raw.get("answer", ""),
+                "citations": json.loads(raw.get("sources_json", "[]")),
+            }
+
+    def set_exact(
+        self,
+        question: str,
+        result: dict,
+        corpus_version: int,
+        chunking_strategy: str,
+    ) -> None:
+        backend = _get_backend()
+        if backend is None:
+            return
+        try:
+            backend.set_exact(
+                query_hash=_question_hash(question, chunking_strategy),
+                question=question,
+                answer=json.dumps(result),
+                sources_json=json.dumps(result.get("citations", [])),
+                doc_version=corpus_version,
+                ttl_seconds=3600,
+            )
+        except Exception:
+            pass
 
     def get_similar(
         self,
         question: str,
-        corpus_version: int,
+        corpus_version: int,  # version checked inside backend via get_doc_version()
         chunking_strategy: str,
         similarity_threshold: float,
     ) -> Optional[dict]:

@@ -242,9 +242,9 @@ def _cache_scoped_question(
 ) -> str:
     scope_parts = []
     if company:
-        scope_parts.append(f"company={company}")
+        scope_parts.append(f"company={company.lower()}")
     if period:
-        scope_parts.append(f"period={period}")
+        scope_parts.append(f"period={period.lower()}")
     if not scope_parts:
         return question
     return f"{question}\nContext: {'; '.join(scope_parts)}"
@@ -303,6 +303,21 @@ def run_adaptive_query(
 
         if cache_allowed:
             cache = get_cache()
+
+            # O(1) exact match — same question text, same scope
+            exact = cache.get_exact(cache_question, corpus_version, cache_scope)
+            if exact is not None:
+                exact["cache_hit"] = True
+                exact["cache_similarity"] = 1.0
+                exact["cache_source_question"] = cache_question
+                return _finalize_result_metadata(
+                    exact,
+                    chunking_strategy=chunking_strategy,
+                    cache_allowed=True,
+                    cache_enabled=use_cache,
+                )
+
+            # O(n) semantic scan — similar but not identical question
             cached = cache.get_similar(
                 question=cache_question,
                 corpus_version=corpus_version,
@@ -310,6 +325,8 @@ def run_adaptive_query(
                 similarity_threshold=similarity_threshold,
             )
             if cached is not None:
+                # Promote to exact cache so the next identical query is O(1)
+                cache.set_exact(cache_question, cached, corpus_version, cache_scope)
                 cached["cache_hit"] = True
                 cached["cache_similarity"] = cached.get("cache_similarity")
                 cached["cache_source_question"] = cached.get("cache_source_question")
@@ -392,7 +409,9 @@ def run_adaptive_query(
                 "period": period,
             }
 
-        if cache_allowed:
+        _dynamic_routes = {"contradiction", "graph", "multi_hop"}
+        cache_store_allowed = cache_allowed and final_result.get("final_route") not in _dynamic_routes
+        if cache_store_allowed:
             cache = get_cache()
             cache.store(
                 question=cache_question,
@@ -400,6 +419,7 @@ def run_adaptive_query(
                 corpus_version=corpus_version,
                 chunking_strategy=cache_scope,
             )
+            cache.set_exact(cache_question, final_result, corpus_version, cache_scope)
 
         return _finalize_result_metadata(
             final_result,
