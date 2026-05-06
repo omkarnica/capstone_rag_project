@@ -256,6 +256,6 @@ uv run uvicorn src.app:app --reload --port 8000
 
 | Name | Role |
 |---|---|
-| Karnica Jain | Backend, knowledge graph, ingestion pipelines |
+| Karnica Jain | Backend, Authentication,  ingestion pipelines |
 | Ruby Gunna | RAG pipeline, LangGraph orchestration, evaluation |
-| Nithu Arjunan | Frontend, authentication, deployment |
+| Nithu Arjunan | Frontend,knowledge graph,raptor tree,ingestion, deployment |
