@@ -1,0 +1,126 @@
+.landing-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top, rgba(216, 232, 223, 0.9), transparent 35%),
+    linear-gradient(135deg, #f3efe5 0%, #d9e2ec 45%, #f8fbff 100%);
+}
+
+.landing-panel {
+  width: min(100%, 960px);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+  padding: 40px;
+  border: 1px solid rgba(22, 48, 43, 0.14);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 24px 70px rgba(39, 62, 77, 0.16);
+  backdrop-filter: blur(14px);
+}
+
+.landing-copy {
+  display: grid;
+  align-content: center;
+  gap: 16px;
+}
+
+.landing-copy h1 {
+  margin: 0;
+  color: #102a43;
+  font-size: clamp(2.5rem, 5vw, 4.2rem);
+  line-height: 0.95;
+}
+
+.landing-eyebrow {
+  margin: 0;
+  color: #486581;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.landing-description {
+  margin: 0;
+  max-width: 30rem;
+  color: #334e68;
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+.landing-form {
+  display: grid;
+  gap: 18px;
+  padding: 28px;
+  border-radius: 22px;
+  background: rgba(16, 42, 67, 0.05);
+}
+
+.landing-field {
+  display: grid;
+  gap: 8px;
+  color: #102a43;
+  font-weight: 600;
+}
+
+.landing-field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border: 1px solid rgba(72, 101, 129, 0.3);
+  border-radius: 14px;
+  background: #ffffff;
+  color: #102a43;
+  font: inherit;
+}
+
+.landing-field input:focus {
+  outline: 3px solid rgba(15, 98, 254, 0.18);
+  border-color: #0f62fe;
+}
+
+.landing-primary-action,
+.landing-secondary-action {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+.landing-primary-action {
+  border: none;
+  background: linear-gradient(135deg, #0f62fe 0%, #165d46 100%);
+  color: #ffffff;
+  box-shadow: 0 16px 28px rgba(15, 98, 254, 0.22);
+}
+
+.landing-secondary-action {
+  border: 1px solid rgba(16, 42, 67, 0.18);
+  background: rgba(255, 255, 255, 0.7);
+  color: #102a43;
+}
+
+.landing-primary-action:hover,
+.landing-secondary-action:hover {
+  transform: translateY(-1px);
+}
+
+@media (max-width: 720px) {
+  .landing-panel {
+    grid-template-columns: 1fr;
+    padding: 28px;
+  }
+
+  .landing-copy h1 {
+    font-size: clamp(2.2rem, 12vw, 3.4rem);
+  }
+}

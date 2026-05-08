@@ -1,0 +1,187 @@
+.workspace-page {
+  min-height: 100vh;
+  padding: 1.5rem;
+  background:
+    radial-gradient(circle at top right, rgba(215, 234, 238, 0.8), transparent 28%),
+    linear-gradient(135deg, #f4efe5 0%, #eef4f6 58%, #f2f6f1 100%);
+  color: #182022;
+}
+
+.workspace-shell {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.workspace-main {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.workspace-header {
+  display: grid;
+  gap: 1rem;
+}
+
+.workspace-title h1 {
+  margin: 0;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(2.8rem, 5vw, 4.2rem);
+}
+
+.workspace-title p,
+.query-card p,
+.status-card__detail,
+.result-card p,
+.answer-card p {
+  color: #5a686a;
+}
+
+.workspace-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.status-card,
+.query-card,
+.answer-card,
+.result-card,
+.diagnostics-card {
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 1.5rem;
+  padding: 1.25rem;
+  box-shadow: 0 18px 40px rgba(43, 58, 61, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.status-card__label {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  color: #778284;
+}
+
+.status-card__value {
+  margin: 0 0 0.2rem;
+  font-size: 1.5rem;
+}
+
+.diagnostics-panel {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+.diagnostics-controls {
+  margin-top: 0.75rem;
+}
+
+.diagnostics-card h2,
+.query-card h2,
+.answer-card h2,
+.result-card h2 {
+  margin-top: 0;
+}
+
+.diagnostics-card button,
+.query-card button {
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.9rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: linear-gradient(135deg, #0f62fe 0%, #165d46 100%);
+  color: #fff;
+  box-shadow: 0 16px 28px rgba(15, 98, 254, 0.22);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    filter 160ms ease;
+}
+
+.diagnostics-card button:disabled,
+.query-card button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.diagnostics-card button:hover:not(:disabled),
+.query-card button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+}
+
+.diagnostics-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.diagnostics-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid #e6eded;
+}
+
+.diagnostics-row dd,
+.diagnostics-row dt {
+  margin: 0;
+}
+
+.query-card textarea {
+  width: 100%;
+  border: 1px solid #d5dfdf;
+  border-radius: 1rem;
+  padding: 1rem;
+  font: inherit;
+  resize: vertical;
+  background: rgba(255, 255, 255, 0.94);
+  box-sizing: border-box;
+  margin: 0.75rem 0 1rem;
+}
+
+.answer-card__error {
+  color: #a63939;
+  font-weight: 600;
+}
+
+.contexts-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.contexts-list pre {
+  white-space: pre-wrap;
+  margin: 0;
+  font-family: "IBM Plex Mono", "Consolas", monospace;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 980px) {
+  .workspace-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .diagnostics-panel {
+    margin-top: 0;
+  }
+}
+
+@media (min-width: 981px) {
+  .diagnostics-panel {
+    margin-top: 8rem;
+  }
+}

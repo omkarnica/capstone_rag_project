@@ -1,0 +1,90 @@
+[
+  {
+    "id": "aapl_sql_001",
+    "tier": 1,
+    "query": "What was Apple's total revenue in fiscal year 2024?",
+    "expected_answer": "Apple's total revenue for fiscal year 2024 was approximately $391.0 billion.",
+    "expected_sources": ["AAPL 10-K 2024", "AAPL XBRL FY2024"],
+    "expected_entities": ["Apple", "FY2024", "391"],
+    "expected_numbers": [391.0],
+    "expected_contradictions": [],
+    "route": "sql"
+  },
+  {
+    "id": "aapl_sql_002",
+    "tier": 1,
+    "query": "What is Apple's revenue breakdown by product segment for fiscal year 2024?",
+    "expected_answer": "Apple FY2024 segment revenue: iPhone ~$201.2B, Services ~$96.2B, Mac ~$29.9B, iPad ~$26.7B, Wearables/Home/Accessories ~$37.0B.",
+    "expected_sources": ["AAPL 10-K 2024", "AAPL XBRL FY2024"],
+    "expected_entities": ["iPhone", "Services", "Mac", "iPad"],
+    "expected_numbers": [201.2, 96.2, 29.9, 26.7],
+    "expected_contradictions": [],
+    "route": "sql"
+  },
+  {
+    "id": "aapl_sql_003",
+    "tier": 1,
+    "query": "What was Apple's net income for fiscal year 2024?",
+    "expected_answer": "Apple's net income for fiscal year 2024 was approximately $93.7 billion.",
+    "expected_sources": ["AAPL XBRL FY2024"],
+    "expected_entities": ["Apple", "net income", "FY2024"],
+    "expected_numbers": [93.7],
+    "expected_contradictions": [],
+    "route": "sql"
+  },
+  {
+    "id": "aapl_sql_004",
+    "tier": 1,
+    "query": "What was Apple's gross margin percentage for fiscal year 2024?",
+    "expected_answer": "Apple's gross margin for fiscal year 2024 was approximately 46.2%.",
+    "expected_sources": ["AAPL XBRL FY2024"],
+    "expected_entities": ["Apple", "gross margin", "FY2024"],
+    "expected_numbers": [46.2],
+    "expected_contradictions": [],
+    "route": "sql"
+  },
+  {
+    "id": "aapl_sql_005",
+    "tier": 1,
+    "query": "What was Apple's total cash and cash equivalents at the end of fiscal year 2024?",
+    "expected_answer": "Apple's cash and cash equivalents at end of FY2024 were approximately $29.9 billion, with total marketable securities bringing liquid assets to ~$153 billion.",
+    "expected_sources": ["AAPL XBRL FY2024"],
+    "expected_entities": ["Apple", "cash", "FY2024"],
+    "expected_numbers": [29.9],
+    "expected_contradictions": [],
+    "route": "sql"
+  },
+  {
+    "id": "aapl_sql_006",
+    "tier": 2,
+    "query": "What was the quarter-over-quarter change in Apple's gross margin for each quarter in fiscal 2024?",
+    "expected_answer": "Apple FY2024 gross margin by quarter: Q1 45.9%, Q2 46.6%, Q3 46.3%, Q4 46.2%. Services gross margin consistently above 70%.",
+    "expected_sources": ["AAPL XBRL FY2024"],
+    "expected_entities": ["Apple", "gross margin", "Q1", "Q2", "Q3", "Q4"],
+    "expected_numbers": [45.9, 46.6, 46.3, 46.2],
+    "expected_contradictions": [],
+    "route": "sql"
+  },
+  {
+    "id": "aapl_sql_007",
+    "tier": 2,
+    "query": "How has Apple's Services revenue grown from fiscal year 2021 to fiscal year 2024?",
+    "expected_answer": "Apple Services revenue grew from approximately $68.4B in FY2021 to $96.2B in FY2024, representing a CAGR of approximately 12%.",
+    "expected_sources": ["AAPL XBRL FY2021", "AAPL XBRL FY2022", "AAPL XBRL FY2023", "AAPL XBRL FY2024"],
+    "expected_entities": ["Apple", "Services", "revenue growth"],
+    "expected_numbers": [68.4, 96.2],
+    "expected_contradictions": [],
+    "route": "sql"
+  },
+  {
+    "id": "aapl_sql_008",
+    "tier": 2,
+    "query": "What was Apple's operating income for each product segment in fiscal year 2024?",
+    "expected_answer": "Apple does not report segment operating income separately; it reports segment revenue. Total operating income for FY2024 was approximately $123.2 billion.",
+    "expected_sources": ["AAPL XBRL FY2024"],
+    "expected_entities": ["Apple", "operating income", "segment"],
+    "expected_numbers": [123.2],
+    "expected_contradictions": [],
+    "route": "sql"
+  }
+]

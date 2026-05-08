@@ -1,0 +1,42 @@
+:root {
+  font-family: "Inter", "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+.project-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem;
+  border: 1px solid rgba(22, 48, 43, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 12px 24px rgba(39, 62, 77, 0.08);
+  width: fit-content;
+}
+
+.project-tab {
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  color: #486581;
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.project-tab:hover {
+  transform: translateY(-1px);
+}
+
+.project-tab.is-active {
+  color: #fff;
+  background: linear-gradient(135deg, #0f62fe 0%, #165d46 100%);
+  box-shadow: 0 10px 18px rgba(15, 98, 254, 0.18);
+}

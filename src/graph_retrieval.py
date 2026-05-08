@@ -29,15 +29,15 @@ Nodes:
 - (:Company {ticker, name})
 - (:Filing {filing_id, form_type, year, source_file})
 - (:Section {section_id, title, text, ordinal, year, form_type})
-- (:Subsidiary {id, name, ticker})
+- (:Subsidiary {subsidiary_id, name, years_present})
 - (:BoardMember {id, name, title, is_current, years_present})
-- (:Patent {patent_id, patent_title, grant_date, grant_year, assignee_organization, cpc_subclass})
+- (:Patent {patent_id, patent_title, grant_date,grant_year, assignee_organization, cpc_subclass})
 - (:TechnologyDomain {cpc_prefix, label, section})
 
 Relationships:
 - (:Company)-[:HAS_FILING]->(:Filing)
 - (:Filing)-[:HAS_SECTION]->(:Section)
-- (:Company)-[:HAS_SUBSIDIARY {year, source_form_type}]->(:Subsidiary)
+- (:Company)-[:HAS_SUBSIDIARY]->(:Subsidiary)
 - (:Company)-[:HAS_BOARD_MEMBER]->(:BoardMember)
 - (:Company)-[:HAS_PATENT]->(:Patent)
 - (:Patent)-[:BELONGS_TO_DOMAIN]->(:TechnologyDomain)
@@ -159,13 +159,12 @@ For board-member questions, prefer years_present, is_current, and explicit year 
 Treat years_present as a list/array field. For year membership use `YEAR IN node.years_present`, not string checks like `CONTAINS "2024"`.
 
 For subsidiary questions:
-- Year is stored on the HAS_SUBSIDIARY relationship as r.year, NOT on the Subsidiary node.
-- ALWAYS filter by `WHERE r.year = <year>` when the question mentions a year.
+- The Subsidiary node has a `years_present` field which is a list of years (e.g. [2021, 2022, 2023]).
+- ALWAYS filter by `WHERE <year> IN s.years_present` when the question mentions a year.
 - If no year is mentioned, return all subsidiaries without a year filter.
-- Always include r.year in the RETURN clause aliased as year.
+- Always include s.years_present in the RETURN clause.
 - Always use DISTINCT to prevent duplicate rows.
-- Always return company name, subsidiary name, and year.
-- The Subsidiary node id property is named `id` (not `subsidiary_id`).
+- Always return company name and subsidiary name.
 
 For filing questions, include form type, year, filing_id, source_file, and section context when available.
 For patent questions, include patent_id, patent_title, grant_date, grant_year, and domain fields when available.
@@ -173,7 +172,7 @@ For patent questions, include patent_id, patent_title, grant_date, grant_year, a
 YEAR FILTERING RULES (critical):
 - If the question mentions a year, you MUST apply a WHERE filter on the relevant node's year field.
 - Never silently drop a year filter.
-- For subsidiaries:   WHERE r.year = <year>    (year is on HAS_SUBSIDIARY relationship, not on the Subsidiary node)
+- For subsidiaries:   WHERE <year> IN s.years_present
 - For filings:        WHERE f.year = <year>
 - For board members:  WHERE <year> IN b.years_present
 - For patents:        WHERE p.grant_year = <year>
@@ -181,7 +180,12 @@ YEAR FILTERING RULES (critical):
 
 DEDUPLICATION RULES (critical):
 - Always use DISTINCT in RETURN clauses to prevent duplicate rows.
-- For subsidiaries specifically: RETURN DISTINCT c.name, s.name, r.year
+- For subsidiaries specifically: RETURN DISTINCT c.name, s.name, s.years_present
+
+ORDER BY RULES (critical):
+- When RETURN uses DISTINCT or aggregation, ORDER BY may only reference columns that appear in the RETURN clause.
+- Never ORDER BY a node property (e.g. s.ordinal, f.year) unless that exact expression is also in the RETURN clause.
+- To sort by a property after DISTINCT, alias it in RETURN first: RETURN DISTINCT ..., s.ordinal AS ordinal ORDER BY ordinal ASC.
 
 Return only Cypher. No explanation. No markdown unless it is a single cypher fence.
 
@@ -253,7 +257,7 @@ def _format_board_member_row(row: dict[str, Any]) -> str:
 
 def _looks_like_subsidiary_row(row: dict[str, Any]) -> bool:
     keys = {key.lower() for key in row}
-    return "subsidiary" in keys or "subsidiary_name" in keys or "subsidiaryname" in keys
+    return "subsidiary" in keys or "subsidiary_name" in keys
 
 
 def _format_subsidiary_row(row: dict[str, Any]) -> str:
@@ -270,7 +274,6 @@ def _format_subsidiary_row(row: dict[str, Any]) -> str:
     name = _row_value(
         row,
         "subsidiary",
-        "Subsidiary",
         "SubsidiaryName",
         "Subsidiary_Name",
         "subsidiary_name",
