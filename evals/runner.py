@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -25,12 +26,14 @@ class EvalRunner:
         dataset: list[dict],
         skip_llm_metrics: bool = False,
         run_id: str | None = None,
+        inter_query_delay: float = 3.0,
     ) -> str:
         if run_id is None:
             run_id = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%S")
         result: dict[str, Any] = {
             "run_id": run_id,
             "completed_at": None,
+            "status": "running",
             "configs": {},
             "baseline_delta": {},
         }
@@ -42,12 +45,14 @@ class EvalRunner:
                 eval_config=eval_config,
                 dataset=dataset,
                 skip_llm_metrics=skip_llm_metrics,
+                inter_query_delay=inter_query_delay,
             )
             result["configs"][config_name] = config_results
             # Incremental write after each config completes
             self._write(run_id, result)
 
         result["completed_at"] = datetime.utcnow().isoformat()
+        result["status"] = "completed"
         result["baseline_delta"] = self._compute_deltas(result["configs"])
         self._write(run_id, result)
 
@@ -60,11 +65,14 @@ class EvalRunner:
         eval_config: dict,
         dataset: list[dict],
         skip_llm_metrics: bool,
+        inter_query_delay: float = 3.0,
     ) -> dict[str, dict]:
         graph = build_graph(eval_config=eval_config)
         tier_scores: dict[str, list[dict]] = defaultdict(list)
 
-        for item in dataset:
+        for i, item in enumerate(dataset):
+            if i > 0:
+                time.sleep(inter_query_delay)
             tier_key = f"tier_{item['tier']}"
             try:
                 scores = self._evaluate_item(graph, item, skip_llm_metrics)

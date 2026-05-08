@@ -35,6 +35,26 @@ def get_cache():
     return _CACHE
 
 
+_ROUTE_SOURCE_LABELS: dict[str, str] = {
+    "sql": "XBRL / SQL",
+    "filings": "SEC Filings",
+    "transcripts": "Earnings Transcripts",
+    "patents": "Patents",
+    "litigation": "Litigation",
+    "graph": "Knowledge Graph",
+    "contradiction": "Contradiction Analysis",
+    "llm_direct": "LLM Direct",
+    "multi_hop": "Multi-source",
+}
+
+
+def _response_source(result: dict) -> str:
+    if result.get("web_results"):
+        return "Web Search"
+    route = result.get("route") or result.get("final_route") or ""
+    return _ROUTE_SOURCE_LABELS.get(route, route or "Unknown")
+
+
 def _doc_contexts(docs: list[dict]) -> list[str]:
     contexts = []
 
@@ -144,6 +164,11 @@ def _finalize_result_metadata(
     if result["plan_type"] == "multi":
         result["retrieved_contexts"] = _aggregate_sub_result_contexts(result.get("sub_results", []))
 
+    if "response_source" not in result:
+        result["response_source"] = _ROUTE_SOURCE_LABELS.get(
+            result.get("final_route", ""), result.get("final_route") or "Unknown"
+        )
+
     tier = tier_for_plan(result["plan_type"], result.get("final_route"))
     result["tier"] = tier
     result["tier_label"] = tier_label(tier)
@@ -222,6 +247,7 @@ def run_single_question(
         "relevant_doc_count": result.get("relevant_doc_count"),
         "retrieval_attempt": result.get("retrieval_attempt"),
         "answer": result.get("answer"),
+        "response_source": _response_source(result),
         "citations": result.get("citations", []),
         "hallucination_grade": result.get("hallucination_grade"),
         "answer_quality_grade": result.get("answer_quality_grade"),
@@ -359,6 +385,7 @@ def run_adaptive_query(
                 "subquestions": plan["subquestions"],
                 "initial_route": single["initial_route"],
                 "final_route": single["final_route"],
+                "response_source": single["response_source"],
                 "final_answer": single["answer"],
                 "citations": single["citations"],
                 "retrieved_contexts": single["retrieved_contexts"],
@@ -397,6 +424,7 @@ def run_adaptive_query(
                 "subquestions": plan["subquestions"],
                 "initial_route": "multi_hop",
                 "final_route": "multi_hop",
+                "response_source": "Multi-source",
                 "final_answer": merged["answer"],
                 "citations": merged["citations"],
                 "sub_results": merged["sub_results"],

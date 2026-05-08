@@ -1,0 +1,145 @@
+[
+  {
+    "id": "aapl_g_001",
+    "tier": 1,
+    "query": "Who were the board members of Apple Inc. in 2023?",
+    "expected_answer": "Apple's board members in 2023 included Tim Cook, Arthur Levinson (Chair), Jeff Williams, James Bell, Al Gore, Andrea Jung, Ron Sugar, Sue Wagner, and Monica Lozano.",
+    "expected_sources": ["Knowledge Graph"],
+    "expected_entities": ["Apple", "Tim Cook", "Arthur Levinson", "board member"],
+    "expected_numbers": [],
+    "expected_contradictions": [],
+    "route": "graph"
+  },
+  {
+    "id": "aapl_g_002",
+    "tier": 1,
+    "query": "Who are the current board members of Apple Inc.?",
+    "expected_answer": "Apple's current board members include Tim Cook (CEO), Arthur Levinson (Chairman), and other independent directors as disclosed in the most recent proxy statement.",
+    "expected_sources": ["Knowledge Graph"],
+    "expected_entities": ["Apple", "Tim Cook", "Arthur Levinson", "director"],
+    "expected_numbers": [],
+    "expected_contradictions": [],
+    "route": "graph"
+  },
+  {
+    "id": "aapl_g_003",
+    "tier": 1,
+    "query": "List all subsidiaries of Apple Inc. reported in 2023.",
+    "expected_answer": "Apple's 2023 subsidiaries include Apple Operations International, Apple Sales International, Apple Operations Europe, Braeburn Capital Inc., and other entities disclosed in Exhibit 21.",
+    "expected_sources": ["Knowledge Graph"],
+    "expected_entities": ["Apple", "Apple Operations International", "Apple Sales International", "subsidiary"],
+    "expected_numbers": [],
+    "expected_contradictions": [],
+    "route": "graph"
+  },
+  {
+    "id": "aapl_g_004",
+    "tier": 1,
+    "query": "What is the ownership structure and corporate hierarchy of Apple Inc.?",
+    "expected_answer": "Apple Inc. is the parent entity with subsidiaries across multiple jurisdictions including Ireland (Apple Operations International, Apple Sales International), Europe (Apple Operations Europe), and the US (Braeburn Capital).",
+    "expected_sources": ["Knowledge Graph"],
+    "expected_entities": ["Apple", "subsidiaries", "ownership structure"],
+    "expected_numbers": [],
+    "expected_contradictions": [],
+    "route": "graph"
+  },
+  {
+    "id": "aapl_g_005",
+    "tier": 1,
+    "query": "List the directors on Apple's board of directors in 2022.",
+    "expected_answer": "Apple's board of directors in 2022 included Tim Cook, Arthur Levinson (Chairman), James Bell, Al Gore, Andrea Jung, Ron Sugar, Sue Wagner, Monica Lozano, and other independent directors.",
+    "expected_sources": ["Knowledge Graph"],
+    "expected_entities": ["Apple", "Tim Cook", "Arthur Levinson", "board of directors"],
+    "expected_numbers": [],
+    "expected_contradictions": [],
+    "route": "graph"
+  },
+  {
+    "id": "aapl_g_006",
+    "tier": 2,
+    "query": "What subsidiaries did Apple Inc. have in 2022 that are no longer present in 2024?",
+    "expected_answer": "Comparison of Apple's subsidiary lists across years from the knowledge graph would reveal any entities removed between 2022 and 2024.",
+    "expected_sources": ["Knowledge Graph"],
+    "expected_entities": ["Apple", "subsidiary", "years_present"],
+    "expected_numbers": [],
+    "expected_contradictions": [],
+    "route": "graph"
+  },
+  {
+    "id": "aapl_f_001",
+    "tier": 1,
+    "query": "What are the primary risk factors disclosed in Apple's most recent 10-K filing?",
+    "expected_answer": "Apple's 10-K discloses risks including supply chain concentration, geopolitical tensions, competition in smartphones and services, and regulatory scrutiny in app stores.",
+    "expected_sources": ["AAPL 10-K 2024"],
+    "expected_entities": ["Apple", "supply chain", "competition", "regulatory"],
+    "expected_numbers": [],
+    "expected_contradictions": [],
+    "route": "filings"
+  },
+  {
+    "id": "aapl_f_002",
+    "tier": 2,
+    "query": "Compare Apple's revenue recognition policy language across 10-K filings from 2021 to 2024. Has anything material changed?",
+    "expected_answer": "Apple's revenue recognition policy has remained largely consistent from 2021-2024, following ASC 606. Minor updates in 2023-2024 reflect expanded services revenue disclosures.",
+    "expected_sources": ["AAPL 10-K 2021", "AAPL 10-K 2022", "AAPL 10-K 2023", "AAPL 10-K 2024"],
+    "expected_entities": ["Apple", "revenue recognition", "ASC 606"],
+    "expected_numbers": [],
+    "expected_contradictions": [],
+    "route": "filings"
+  },
+  {
+    "id": "aapl_f_003",
+    "tier": 2,
+    "query": "Which specific Item 1A risk factors were added new in Apple's most recent 10-K versus the prior year?",
+    "expected_answer": "Apple's FY2024 10-K added new risk factors around EU Digital Markets Act compliance and generative AI regulatory uncertainty not present in the FY2023 10-K.",
+    "expected_sources": ["AAPL 10-K 2024", "AAPL 10-K 2023"],
+    "expected_entities": ["Apple", "Digital Markets Act", "generative AI", "regulatory"],
+    "expected_numbers": [],
+    "expected_contradictions": [],
+    "route": "filings"
+  },
+  {
+    "id": "aapl_f_004",
+    "tier": 2,
+    "query": "What does Apple's 10-K disclose about geographic revenue concentration and China exposure risk?",
+    "expected_answer": "Apple's 10-K discloses that Greater China represents approximately 17-19% of total revenue and flags geopolitical risk, trade restrictions, and regulatory changes in China as material risks.",
+    "expected_sources": ["AAPL 10-K 2024"],
+    "expected_entities": ["Apple", "China", "geographic concentration", "geopolitical"],
+    "expected_numbers": [17.0, 19.0],
+    "expected_contradictions": [],
+    "route": "filings"
+  },
+  {
+    "id": "aapl_t_001",
+    "tier": 2,
+    "query": "What did Apple's management say about iPhone demand and Services growth on the FY2024 earnings call?",
+    "expected_answer": "Apple management highlighted strong iPhone 15 upgrade cycle momentum and Services revenue acceleration, citing record App Store performance and Apple TV+ subscriber growth on the FY2024 earnings call.",
+    "expected_sources": ["AAPL Earnings Transcript FY2024"],
+    "expected_entities": ["Apple", "iPhone", "Services", "earnings call"],
+    "expected_numbers": [],
+    "expected_contradictions": [],
+    "route": "transcripts"
+  },
+  {
+    "id": "aapl_c_001",
+    "tier": 3,
+    "query": "Identify instances where Apple's earnings call guidance was materially inconsistent with risk factor disclosures in subsequent quarterly filings.",
+    "expected_answer": "Analysis of Apple earnings calls vs. 10-Q risk factors: management consistently cited strong iPhone demand on calls while risk factors disclosed supply chain and demand uncertainty.",
+    "expected_sources": ["AAPL Earnings Transcripts 2023-2024", "AAPL 10-Q 2023", "AAPL 10-Q 2024"],
+    "expected_entities": ["Apple", "iPhone", "guidance", "risk factors"],
+    "expected_numbers": [],
+    "expected_contradictions": ["demand optimism on calls vs. supply risk in filings"],
+    "route": "contradiction"
+  },
+  {
+    "id": "aapl_c_002",
+    "tier": 4,
+    "query": "Build a complete due diligence risk profile for Apple using SEC filings and earnings transcripts: identify top risk factors, management tone, and any narrative inconsistencies.",
+    "expected_answer": "Apple risk profile: Top risks — China concentration, App Store regulation, services competition. Management tone — consistently optimistic on calls with hedged language in filings on China and regulatory exposure. Key inconsistency — demand narrative on calls vs. geographic risk disclosure in 10-K.",
+    "expected_sources": ["AAPL 10-K 2024", "AAPL Earnings Transcripts 2024"],
+    "expected_entities": ["Apple", "risk factors", "management credibility", "China"],
+    "expected_numbers": [],
+    "expected_contradictions": ["China demand optimism on calls vs. geographic concentration risk in filings"],
+    "route": "contradiction"
+  }
+]

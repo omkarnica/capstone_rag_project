@@ -83,22 +83,89 @@ def get_run_ablation(run_id: str) -> dict[str, Any]:
     }
 
 
+_DATASETS = {
+    "default": "golden_queries.json",
+    "aapl_retrieval": "aapl_retrieval_eval.json",
+    "aapl_xbrl": "aapl_xbrl_eval.json",
+}
+
+
+@router.get("/datasets")
+def list_datasets() -> dict[str, list[str]]:
+    return {"datasets": list(_DATASETS.keys())}
+
+
+@router.get("/datasets/{dataset_name}")
+def get_dataset(dataset_name: str) -> dict:
+    if dataset_name not in _DATASETS:
+        raise HTTPException(status_code=404, detail=f"Unknown dataset '{dataset_name}'. Available: {list(_DATASETS.keys())}")
+    path = Path(__file__).parent.parent / "evals" / "dataset" / _DATASETS[dataset_name]
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Dataset file not found")
+    queries = json.loads(path.read_text(encoding="utf-8"))
+    return {
+        "dataset": dataset_name,
+        "total": len(queries),
+        "routes": {r: sum(1 for q in queries if q.get("route") == r) for r in sorted({q.get("route") for q in queries})},
+        "queries": queries,
+    }
+
+
 @router.post("/trigger")
-def trigger_eval(background_tasks: BackgroundTasks) -> dict[str, str]:
+def trigger_eval(
+    background_tasks: BackgroundTasks,
+    skip_llm_metrics: bool = False,
+    max_queries: int | None = None,
+    routes: str | None = None,
+    dataset: str = "default",
+) -> dict[str, str]:
     from datetime import datetime
     from evals.configs.ablation_configs import ABLATION_CONFIGS
     from evals.runner import EvalRunner
 
-    dataset_path = Path(__file__).parent.parent / "evals" / "dataset" / "golden_queries.json"
+    if dataset not in _DATASETS:
+        raise HTTPException(status_code=400, detail=f"Unknown dataset '{dataset}'. Available: {list(_DATASETS.keys())}")
+
+    dataset_path = Path(__file__).parent.parent / "evals" / "dataset" / _DATASETS[dataset]
     if not dataset_path.exists():
-        raise HTTPException(status_code=500, detail="Golden queries dataset not found")
+        raise HTTPException(status_code=500, detail=f"Dataset file not found: {_DATASETS[dataset]}")
 
     dataset = json.loads(dataset_path.read_text(encoding="utf-8"))
+    if max_queries is not None:
+        dataset = dataset[:max_queries]
+    if routes is not None:
+        allowed = {r.strip() for r in routes.split(",")}
+        dataset = [q for q in dataset if q.get("route") in allowed]
+    if not dataset:
+        raise HTTPException(status_code=400, detail="No queries match the requested filters")
     run_id = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%S")
 
-    def _run(rid: str):
-        runner = EvalRunner()
-        runner.run(configs=ABLATION_CONFIGS, dataset=dataset, run_id=rid)
+    # Write skeleton immediately so the first poll doesn't 404
+    results_dir = _results_dir()
+    results_dir.mkdir(parents=True, exist_ok=True)
+    skeleton = {
+        "run_id": run_id,
+        "completed_at": None,
+        "status": "running",
+        "configs": {},
+        "baseline_delta": {},
+    }
+    (results_dir / f"{run_id}.json").write_text(
+        json.dumps(skeleton), encoding="utf-8"
+    )
+
+    def _run(rid: str) -> None:
+        try:
+            runner = EvalRunner()
+            runner.run(configs=ABLATION_CONFIGS, dataset=dataset, run_id=rid, skip_llm_metrics=skip_llm_metrics, inter_query_delay=8.0)
+        except Exception as exc:
+            # Write error so the frontend stops polling instead of looping forever
+            error_path = results_dir / f"{rid}.json"
+            error_result = json.loads(error_path.read_text(encoding="utf-8")) if error_path.exists() else skeleton.copy()
+            error_result["completed_at"] = datetime.utcnow().isoformat()
+            error_result["status"] = "error"
+            error_result["error"] = str(exc)
+            error_path.write_text(json.dumps(error_result), encoding="utf-8")
 
     background_tasks.add_task(_run, run_id)
     return {"run_id": run_id, "status": "started"}

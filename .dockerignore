@@ -1,0 +1,17 @@
+.git
+.venv
+.pytest_cache
+.benchmarks
+.claude
+.deepeval
+__pycache__
+logs
+frontend/node_modules
+frontend/dist
+frontend/.vite
+docs
+cache.zip
+ma_oracle.egg-info
+*.pyc
+*.pyo
+*.pyd
